@@ -106,7 +106,7 @@ async function getBookById(id) {
   }
 }
 
-async function getAllBooks(limit = 100, page = 1) {
+async function getAllBooks(limit = 300, page = 1) {
   try {
     if (limit < 1 || !Number.isInteger(limit) || page < 1 || !Number.isInteger(page)) {
       throw new AppError('Invalid limit or page parameters', 400);
