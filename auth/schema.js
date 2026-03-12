@@ -20,6 +20,10 @@ const userSchema = new Schema({
     type: String,
     sparse: true,
     lowercase: true
+  },
+  isSubscribed: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 

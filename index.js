@@ -4,7 +4,9 @@ const morgan = require('morgan');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
-const authRouter = require('./auth/controller');
+const authRouter = require('./auth/routes');
+const { authenticateToken } = require('./auth/middleware');
+const razorpayRouter = require('./razorpay/routes');
 const sectionRouter = require('./sasanam-section/routes');
 const booksRouter = require('./sasanam-books/routes');
 const connect = require('./db');
@@ -23,7 +25,21 @@ const swaggerBase = {
       title: 'Express Swagger API',
       version: '1.0.0',
       description: 'A simple Express API documented with Swagger'
-    }
+    },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT'
+        }
+      }
+    },
+    security: [
+      {
+        bearerAuth: []
+      }
+    ]
   },
   apis: ['./routes/*.js', './auth/*.js', './sasanam-section/*.js', './sasanam-books/*.js']
 };
@@ -33,8 +49,9 @@ app.get('/', (req, res) => {
 });
 
 app.use('/auth', authRouter);
-app.use('/sasanam-section', sectionRouter);
-app.use('/sasanam-books', booksRouter);
+app.use('/razorpay', authenticateToken, razorpayRouter);
+app.use('/sasanam-section', authenticateToken, sectionRouter);
+app.use('/sasanam-books', authenticateToken, booksRouter);
 
 function startServer(p, attempts = 5) {
   const server = app.listen(p, () => {

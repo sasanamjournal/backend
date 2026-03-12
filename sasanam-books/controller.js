@@ -25,7 +25,7 @@ const validateCreateBook = (req, res, next) => {
       code: 'INVALID_REQUEST'
     });
   }
-  if (bookName.length > 100) {
+  if (bookName.length > 300) {
     return res.status(400).json({
       success: false,
       error: 'Book name cannot exceed 100 characters',
@@ -46,7 +46,7 @@ const validateCreateBook = (req, res, next) => {
       code: 'INVALID_REQUEST'
     });
   }
-  if (authorName.length > 100) {
+  if (authorName.length > 200) {
     return res.status(400).json({
       success: false,
       error: 'Author name cannot exceed 100 characters',
@@ -185,7 +185,7 @@ const getBookById = async (req, res) => {
 const getAllBooks = async (req, res) => {
   try {
     let { limit, page } = req.query;
-    limit = limit ? parseInt(limit, 10) : 100;
+    limit = limit ? parseInt(limit, 10) : 300;
     page = page ? parseInt(page, 10) : 1;
     if (isNaN(limit) || limit < 1 || isNaN(page) || page < 1) {
       return res.status(400).json({
