@@ -54,6 +54,7 @@ const createOrder = async (payload, userId) => {
     }
 
     const amount = payload && payload.amount;
+    
     const currency = normalizeCurrency(payload && payload.currency);
     const receipt = payload && payload.receipt ? String(payload.receipt).trim() : buildReceipt();
     const notes = normalizeNotes(payload && payload.notes);

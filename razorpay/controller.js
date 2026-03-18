@@ -1,9 +1,10 @@
 const razorpayService = require('./service');
 
 const createOrder = async (req, res) => {
+  console.log("check", req.body);
   try {
     const result = await razorpayService.createOrder(req.body, req.user && req.user.sub);
-
+    console.log('Razorpay create order controller result:', req.body,req.user && req.user.sub, result);
     if (result.error) {
       return res.status(result.status || 400).json({
         success: false,

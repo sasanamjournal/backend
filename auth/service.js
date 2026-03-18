@@ -18,15 +18,15 @@ const isValidEmail = (email) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
-const signup = async (username, password, email) => {
-  const normalizedUsername = normalizeUsername(username);
+const signup = async (fullName, password, email) => {
+  const normalizedFullname = normalizeUsername(fullName);
   const normalizedEmail = email ? normalizeEmail(email) : undefined;
 
-  if (!normalizedUsername || !password) {
-    return { error: 'username and password required', status: 400 };
+  if (!normalizedEmail || !password) {
+    return { error: 'fullName and password required', status: 400 };
   }
-  if (normalizedUsername.length < 3 || normalizedUsername.length > 30) {
-    return { error: 'username must be 3-30 characters', status: 400 };
+  if (normalizedFullname.length < 3 || normalizedFullname.length > 30) {
+    return { error: 'fullName must be 3-30 characters', status: 400 };
   }
   if (typeof password !== 'string' || password.length < 6) {
     return { error: 'password must be at least 6 characters', status: 400 };
@@ -38,35 +38,35 @@ const signup = async (username, password, email) => {
   await connect();
   const User = makeUserModel(mongoose);
 
-  const existingUser = await User.findOne({ username: normalizedUsername }).exec();
+  const existingUser = await User.findOne({ email: normalizedEmail }).exec();
   if (existingUser) {
     return { error: 'username already exists', status: 409 };
   }
 
-  if (normalizedEmail) {
-    const existingEmail = await User.findOne({ email: normalizedEmail }).exec();
+  if (normalizedFullname) {
+    const existingEmail = await User.findOne({ fullName: normalizedFullname }).exec();
     if (existingEmail) {
-      return { error: 'email already exists', status: 409 };
+      return { error: 'fullName already exists', status: 409 };
     }
   }
 
   try {
     const user = new User({
-      username: normalizedUsername,
+      fullName: normalizedFullname,
       passwordHash: password,
       isSubscribed: false,
-      ...(normalizedEmail ? { email: normalizedEmail } : {})
+      email:normalizedEmail
     });
     await user.save();
 
-    const payload = { sub: user._id.toString(), username: user.username };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
-
     return {
-      token,
-      expiresIn: TOKEN_EXPIRES_IN,
-      user: user.toJSON(),
-      status: 201
+      // userDetails:{
+      //   userId:user._id,
+      //   fullName:user.fullName,
+      //   isSubscribed:user.isSubscribed
+      // },
+      success: true,
+      status: 201,
     };
   } catch (err) {
     if (err && err.code === 11000) {
@@ -76,23 +76,27 @@ const signup = async (username, password, email) => {
   }
 };
 
-const login = async (username, password) => {
-  const normalizedUsername = normalizeUsername(username);
-  if (!normalizedUsername || !password) throw new Error('username and password required');
+const login = async (email, password) => {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail || !password) throw new Error('email and password required');
 
   await connect();
   const User = makeUserModel(mongoose);
 
-  const user = await User.findOne({ username: normalizedUsername }).exec();
+  const user = await User.findOne({ email: normalizedEmail }).exec();
   if (!user) return { error: 'invalid credentials', status: 401 };
-
+  console.log('Found user for login:', user);
   const valid = await user.comparePassword(password);
   if (!valid) return { error: 'invalid credentials', status: 401 };
 
-  const payload = { sub: user._id.toString(), username: user.username };
+  const payload = { sub: user._id.toString(), username: user.email };
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
 
-  return { token, expiresIn: TOKEN_EXPIRES_IN, user: user.toJSON(), status: 200 };
+  return { token, expiresIn: TOKEN_EXPIRES_IN, 
+   user:{
+      username: user.email, isSubscribed: user.isSubscribed,
+   },
+    status: 200 };
 };
 
 module.exports = { login, signup };

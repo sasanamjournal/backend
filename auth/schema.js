@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const userSchema = new Schema({
-  username: {
+  fullName: {
     type: String,
     required: true,
     unique: true,
