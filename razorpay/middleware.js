@@ -3,7 +3,7 @@ const isPlainObject = (value) => {
 };
 
 const validateCreateOrder = (req, res, next) => {
-  const { amount, currency, receipt, notes } = req.body || {};
+  const { amount, currency, receipt } = req.body || {}; 
 
   if (!Number.isInteger(amount) || amount < 1) {
     return res.status(400).json({
@@ -31,14 +31,6 @@ const validateCreateOrder = (req, res, next) => {
         code: 'INVALID_REQUEST'
       });
     }
-  }
-
-  if (notes !== undefined && !isPlainObject(notes)) {
-    return res.status(400).json({
-      success: false,
-      error: 'notes must be an object',
-      code: 'INVALID_REQUEST'
-    });
   }
 
   next();
