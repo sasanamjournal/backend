@@ -11,16 +11,16 @@ const router = express.Router();
 /**
  * @swagger
  * tags:
- *   name: Razorpay
- *   description: Razorpay payment management APIs
+ *   name: SubscriptionPayment
+ *   description: Subscription payment management APIs
  */
 
 /**
  * @swagger
- * /razorpay/order:
+ * /subscription-payment/order:
  *   post:
- *     summary: Create a Razorpay order
- *     tags: [Razorpay]
+ *     summary: Create a subscription payment order
+ *     tags: [SubscriptionPayment]
  *     requestBody:
  *       required: true
  *       content:
@@ -52,10 +52,10 @@ router.post('/order', validateCreateOrder, controller.createOrder);
 
 /**
  * @swagger
- * /razorpay/verify:
+ * /subscription-payment/verify:
  *   post:
- *     summary: Verify a Razorpay payment and activate subscription
- *     tags: [Razorpay]
+ *     summary: Verify a subscription payment and activate subscription
+ *     tags: [SubscriptionPayment]
  *     requestBody:
  *       required: true
  *       content:
@@ -85,10 +85,10 @@ router.post('/verify', validateVerifyPayment, controller.verifyPayment);
 
 /**
  * @swagger
- * /razorpay/payments:
+ * /subscription-payment/payments:
  *   get:
  *     summary: Get current user payments
- *     tags: [Razorpay]
+ *     tags: [SubscriptionPayment]
  *     parameters:
  *       - in: query
  *         name: limit
@@ -108,10 +108,10 @@ router.get('/payments', validatePaymentListQuery, controller.getPayments);
 
 /**
  * @swagger
- * /razorpay/payments/{orderId}:
+ * /subscription-payment/payments/{orderId}:
  *   get:
- *     summary: Get a payment by Razorpay order ID
- *     tags: [Razorpay]
+ *     summary: Get a payment by order ID
+ *     tags: [SubscriptionPayment]
  *     parameters:
  *       - in: path
  *         name: orderId

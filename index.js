@@ -6,9 +6,12 @@ const swaggerUi = require('swagger-ui-express');
 
 const authRouter = require('./auth/routes');
 const { authenticateToken } = require('./auth/middleware');
-const razorpayRouter = require('./razorpay/routes');
+const subscriptionPaymentRouter = require('./subscriptionPayment/routes');
+const donationPaymentRouter = require('./donationPayment/routes');
+const donationListRouter = require('./donationList/routes');
 const sectionRouter = require('./sasanam-section/routes');
 const booksRouter = require('./sasanam-books/routes');
+const userNewsRouter = require('./userNews/routes');
 const connect = require('./db');
 
 const app = express();
@@ -41,7 +44,16 @@ const swaggerBase = {
       }
     ]
   },
-  apis: ['./routes/*.js', './auth/*.js', './sasanam-section/*.js', './sasanam-books/*.js']
+  apis: [
+    './routes/*.js',
+    './auth/*.js',
+    './subscriptionPayment/*.js',
+    './donationPayment/*.js',
+    './donationList/*.js',
+    './sasanam-section/*.js',
+    './sasanam-books/*.js',
+    './userNews/*.js'
+  ]
 };
 
 app.get('/', (req, res) => {
@@ -49,9 +61,12 @@ app.get('/', (req, res) => {
 });
 
 app.use('/auth', authRouter);
-app.use('/razorpay', authenticateToken, razorpayRouter);
+app.use('/donation-list', donationListRouter);
+app.use('/subscription-payment', authenticateToken, subscriptionPaymentRouter);
+app.use('/donation-payment', authenticateToken, donationPaymentRouter);
 app.use('/sasanam-section', authenticateToken, sectionRouter);
 app.use('/sasanam-books', authenticateToken, booksRouter);
+app.use('/user-news', authenticateToken, userNewsRouter);
 
 function startServer(p, attempts = 5) {
   const server = app.listen(p, () => {

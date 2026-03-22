@@ -1,6 +1,6 @@
 const { Schema } = require('mongoose');
 
-const razorpayPaymentSchema = new Schema({
+const donationPaymentSchema = new Schema({
   userId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
@@ -46,6 +46,12 @@ const razorpayPaymentSchema = new Schema({
     default: 'created',
     index: true
   },
+  donorMessage: {
+    type: String,
+    default: null,
+    trim: true,
+    maxlength: 500
+  },
   notes: {
     type: Schema.Types.Mixed,
     default: {}
@@ -56,10 +62,10 @@ const razorpayPaymentSchema = new Schema({
   }
 }, { timestamps: true });
 
-module.exports = function makeRazorpayPaymentModel(mongoose) {
+module.exports = function makeDonationPaymentModel(mongoose) {
   try {
-    return mongoose.model('RazorpayPayment');
+    return mongoose.model('DonationPayment');
   } catch (e) {
-    return mongoose.model('RazorpayPayment', razorpayPaymentSchema);
+    return mongoose.model('DonationPayment', donationPaymentSchema);
   }
 };
