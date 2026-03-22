@@ -1,10 +1,10 @@
-const razorpayService = require('./service');
+const subscriptionPaymentService = require('./service');
 
 const createOrder = async (req, res) => {
   console.log("check", req.body);
   try {
-    const result = await razorpayService.createOrder(req.body, req.user && req.user.sub);
-    console.log('Razorpay create order controller result:', req.body,req.user && req.user.sub, result);
+    const result = await subscriptionPaymentService.createOrder(req.body, req.user && req.user.sub);
+    console.log('SubscriptionPayment create order controller result:', req.body,req.user && req.user.sub, result);
     if (result.error) {
       return res.status(result.status || 400).json({
         success: false,
@@ -15,11 +15,11 @@ const createOrder = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Razorpay order created successfully',
+      message: 'Subscription payment order created successfully',
       data: result.data
     });
   } catch (err) {
-    console.error('Razorpay create order controller error:', err);
+    console.error('SubscriptionPayment create order controller error:', err);
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -30,7 +30,7 @@ const createOrder = async (req, res) => {
 
 const verifyPayment = async (req, res) => {
   try {
-    const result = await razorpayService.verifyPayment(req.body, req.user && req.user.sub);
+    const result = await subscriptionPaymentService.verifyPayment(req.body, req.user && req.user.sub);
 
     if (result.error) {
       return res.status(result.status || 400).json({
@@ -46,7 +46,7 @@ const verifyPayment = async (req, res) => {
       data: result.data
     });
   } catch (err) {
-    console.error('Razorpay verify payment controller error:', err);
+    console.error('SubscriptionPayment verify payment controller error:', err);
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -59,7 +59,7 @@ const getPayments = async (req, res) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
     const page = req.query.page ? parseInt(req.query.page, 10) : 1;
-    const result = await razorpayService.getPaymentsByUser(req.user && req.user.sub, limit, page);
+    const result = await subscriptionPaymentService.getPaymentsByUser(req.user && req.user.sub, limit, page);
 
     if (result.error) {
       return res.status(result.status || 400).json({
@@ -74,7 +74,7 @@ const getPayments = async (req, res) => {
       data: result.data
     });
   } catch (err) {
-    console.error('Razorpay get payments controller error:', err);
+    console.error('SubscriptionPayment get payments controller error:', err);
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -85,7 +85,7 @@ const getPayments = async (req, res) => {
 
 const getPaymentByOrderId = async (req, res) => {
   try {
-    const result = await razorpayService.getPaymentByOrderId(req.params.orderId, req.user && req.user.sub);
+    const result = await subscriptionPaymentService.getPaymentByOrderId(req.params.orderId, req.user && req.user.sub);
 
     if (result.error) {
       return res.status(result.status || 400).json({
@@ -100,7 +100,7 @@ const getPaymentByOrderId = async (req, res) => {
       data: result.data
     });
   } catch (err) {
-    console.error('Razorpay get payment controller error:', err);
+    console.error('SubscriptionPayment get payment controller error:', err);
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
