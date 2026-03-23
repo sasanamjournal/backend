@@ -1,5 +1,3 @@
-
-const connect = require('../db');
 const mongoose = require('mongoose');
 const Books = require('./schema');
 
@@ -27,14 +25,12 @@ async function createBook(data) {
       throw new AppError('Valid sectionId is required', 400);
     }
 
-    await connect();
-
     // Check for duplicate book (by name and author in the same section)
     const existing = await Books.findOne({
       bookName: data.bookName.trim(),
       authorName: data.authorName.trim(),
       sectionId: data.sectionId
-    }).exec();
+    }).lean().exec();
     if (existing) {
       throw new AppError('Book with this name and author already exists in this section', 409);
     }
@@ -79,13 +75,12 @@ async function getBookById(id) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       throw new AppError('Invalid book ID format', 400);
     }
-    await connect();
-    const book = await Books.findById(id).exec();
+    const book = await Books.findById(id).lean().exec();
     if (!book) {
       throw new AppError('Book not found', 404);
     }
     return {
-      data: book.toObject(),
+      data: book,
       status: 200,
       error: null
     };
@@ -114,17 +109,23 @@ async function getAllBooks(limit = 100, page = 1) {
     if (limit > 1000) {
       throw new AppError('Limit cannot exceed 1000', 400);
     }
-    await connect();
+
     const skip = (page - 1) * limit;
-    const books = await Books.find()
-      .limit(limit)
-      .skip(skip)
-      .sort({ createdAt: -1 })
-      .exec();
-    const total = await Books.countDocuments();
+
+    // Parallel execution for faster response
+    const [books, total] = await Promise.all([
+      Books.find()
+        .limit(limit)
+        .skip(skip)
+        .sort({ createdAt: -1 })
+        .lean()
+        .exec(),
+      Books.countDocuments()
+    ]);
+
     return {
       data: {
-        books: books.map(b => b.toObject()),
+        books,
         total,
         limit,
         page
@@ -171,8 +172,7 @@ async function updateBook(id, data) {
       throw new AppError('sectionId must be a valid ObjectId', 400);
     }
 
-    await connect();
-    const existing = await Books.findById(id).exec();
+    const existing = await Books.findById(id).lean().exec();
     if (!existing) {
       throw new AppError('Book not found', 404);
     }
@@ -190,7 +190,7 @@ async function updateBook(id, data) {
         bookName: checkName,
         authorName: checkAuthor,
         sectionId: checkSection
-      }).exec();
+      }).lean().exec();
       if (duplicate && duplicate._id.toString() !== id) {
         throw new AppError('Book with this name and author already exists in this section', 409);
       }
@@ -204,10 +204,10 @@ async function updateBook(id, data) {
         ...(data.sectionId !== undefined && { sectionId: data.sectionId })
       },
       { new: true, runValidators: true }
-    ).exec();
+    ).lean().exec();
 
     return {
-      data: updated.toObject(),
+      data: updated,
       status: 200,
       error: null
     };
@@ -240,13 +240,12 @@ async function deleteBook(id) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       throw new AppError('Invalid book ID format', 400);
     }
-    await connect();
-    const book = await Books.findByIdAndDelete(id).exec();
+    const book = await Books.findByIdAndDelete(id).lean().exec();
     if (!book) {
       throw new AppError('Book not found', 404);
     }
     return {
-      data: book.toObject(),
+      data: book,
       status: 200,
       error: null
     };

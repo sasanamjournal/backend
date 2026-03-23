@@ -1,18 +1,25 @@
 const jwt = require('jsonwebtoken');
-const connect = require('../db');
 const mongoose = require('mongoose');
 const makeUserModel = require('./schema');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 const TOKEN_EXPIRES_IN = process.env.TOKEN_EXPIRES_IN || '10d';
 
+// Cache the User model reference
+let User = null;
+function getModel() {
+  if (!User) {
+    User = makeUserModel(mongoose);
+  }
+  return User;
+}
+
 async function login(username, password) {
   if (!username || !password) throw new Error('username and password required');
 
-  await connect();
-  const User = makeUserModel(mongoose);
+  const UserModel = getModel();
 
-  const user = await User.findOne({ username }).exec();
+  const user = await UserModel.findOne({ username }).exec();
   if (!user) return { error: 'invalid credentials', status: 401 };
 
   const valid = await user.comparePassword(password);

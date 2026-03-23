@@ -1,6 +1,14 @@
-const connect = require('../db');
 const mongoose = require('mongoose');
 const makeSection = require('./schema');
+
+// Cache model reference — avoid re-creating on every call
+let Section = null;
+function getModel() {
+  if (!Section) {
+    Section = makeSection(mongoose);
+  }
+  return Section;
+}
 
 class AppError extends Error {
   constructor(message, statusCode) {
@@ -21,16 +29,15 @@ async function createSection(data) {
       throw new AppError('Section name is required and must be a non-empty string', 400);
     }
 
-    await connect();
-    const Section = makeSection(mongoose);
+    const SectionModel = getModel();
 
     // Check for duplicate name
-    const existing = await Section.findOne({ name: data.name.trim() }).exec();
+    const existing = await SectionModel.findOne({ name: data.name.trim() }).lean().exec();
     if (existing) {
       throw new AppError('Section with this name already exists', 409);
     }
 
-    const section = new Section({
+    const section = new SectionModel({
       name: data.name.trim()
     });
 
@@ -70,16 +77,14 @@ async function getSectionById(id) {
       throw new AppError('Invalid section ID format', 400);
     }
 
-    await connect();
-    const Section = makeSection(mongoose);
-
-    const section = await Section.findById(id).exec();
+    const SectionModel = getModel();
+    const section = await SectionModel.findById(id).lean().exec();
     if (!section) {
       throw new AppError('Section not found', 404);
     }
 
     return { 
-      data: section.toObject(), 
+      data: section, 
       status: 200, 
       error: null 
     };
@@ -108,18 +113,24 @@ async function getAllSections(limit = 100, page = 1) {
     if (limit > 1000) {
       throw new AppError('Limit cannot exceed 1000', 400);
     }
-    await connect();
-    const Section = makeSection(mongoose);
+
+    const SectionModel = getModel();
     const skip = (page - 1) * limit;
-    const sections = await Section.find()
-      .limit(limit)
-      .skip(skip)
-      .sort({ createdAt: -1 })
-      .exec();
-    const total = await Section.countDocuments();
+
+    // Use lean() for faster serialization and run count in parallel
+    const [sections, total] = await Promise.all([
+      SectionModel.find()
+        .limit(limit)
+        .skip(skip)
+        .sort({ createdAt: -1 })
+        .lean()
+        .exec(),
+      SectionModel.countDocuments()
+    ]);
+
     return { 
       data: {
-        sections: sections.map(s => s.toObject()),
+        sections,
         total,
         limit,
         page
@@ -162,30 +173,29 @@ async function updateSection(id, data) {
       throw new AppError('Section name is required for update', 400);
     }
 
-    await connect();
-    const Section = makeSection(mongoose);
+    const SectionModel = getModel();
 
-    const existing = await Section.findById(id).exec();
+    const existing = await SectionModel.findById(id).lean().exec();
     if (!existing) {
       throw new AppError('Section not found', 404);
     }
 
     // Check for duplicate name if name is being changed
     if (data.name.trim() !== existing.name) {
-      const duplicate = await Section.findOne({ name: data.name.trim() }).exec();
+      const duplicate = await SectionModel.findOne({ name: data.name.trim() }).lean().exec();
       if (duplicate) {
         throw new AppError('Section with this name already exists', 409);
       }
     }
 
-    const section = await Section.findByIdAndUpdate(
+    const section = await SectionModel.findByIdAndUpdate(
       id,
       { name: data.name.trim() },
       { new: true, runValidators: true }
-    ).exec();
+    ).lean().exec();
 
     return { 
-      data: section.toObject(), 
+      data: section, 
       status: 200, 
       error: null 
     };
@@ -219,16 +229,15 @@ async function deleteSection(id) {
       throw new AppError('Invalid section ID format', 400);
     }
 
-    await connect();
-    const Section = makeSection(mongoose);
+    const SectionModel = getModel();
 
-    const section = await Section.findByIdAndDelete(id).exec();
+    const section = await SectionModel.findByIdAndDelete(id).lean().exec();
     if (!section) {
       throw new AppError('Section not found', 404);
     }
 
     return { 
-      data: section.toObject(), 
+      data: section, 
       status: 200, 
       error: null 
     };

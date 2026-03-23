@@ -1,4 +1,4 @@
-const { Schema, model } = require('mongoose');
+const { Schema } = require('mongoose');
 
 const sectionSchema = new Schema({
   name: {
@@ -13,8 +13,11 @@ const sectionSchema = new Schema({
 // Create unique index on name for better query performance
 sectionSchema.index({ name: 1 });
 
-const makeSectionModel = (mongoose) => {
-  return mongoose.model('Section', sectionSchema, 'sections');
+// Avoid OverwriteModelError: reuse existing model if already registered
+module.exports = function makeSectionModel(mongoose) {
+  try {
+    return mongoose.model('Section');
+  } catch (e) {
+    return mongoose.model('Section', sectionSchema, 'sections');
+  }
 };
-
-module.exports = makeSectionModel;
