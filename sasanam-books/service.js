@@ -80,12 +80,13 @@ async function getBookById(id) {
       throw new AppError('Invalid book ID format', 400);
     }
     await connect();
-    const book = await Books.findById(id).exec();
-    if (!book) {
+    const books = await Books.find({ sectionId: id }).exec();
+    console.log("books", books);
+    if (!books || books.length === 0) {
       throw new AppError('Book not found', 404);
     }
     return {
-      data: book.toObject(),
+      data: books.map(b => b.toObject()),
       status: 200,
       error: null
     };

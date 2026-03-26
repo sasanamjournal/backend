@@ -11,6 +11,7 @@ const donationPaymentRouter = require('./donationPayment/routes');
 const donationListRouter = require('./donationList/routes');
 const sectionRouter = require('./sasanam-section/routes');
 const booksRouter = require('./sasanam-books/routes');
+const sasanamBookDetailsRouter = require('./sasanam-book-details/routes');
 const userNewsRouter = require('./userNews/routes');
 const connect = require('./db');
 
@@ -52,7 +53,8 @@ const swaggerBase = {
     './donationList/*.js',
     './sasanam-section/*.js',
     './sasanam-books/*.js',
-    './userNews/*.js'
+    './userNews/*.js',
+    './sasanam-book-details/*.js'
   ]
 };
 
@@ -66,7 +68,9 @@ app.use('/subscription-payment', authenticateToken, subscriptionPaymentRouter);
 app.use('/donation-payment', authenticateToken, donationPaymentRouter);
 app.use('/sasanam-section', authenticateToken, sectionRouter);
 app.use('/sasanam-books', authenticateToken, booksRouter);
+
 app.use('/user-news', authenticateToken, userNewsRouter);
+app.use('/sasanam-book-details', authenticateToken, sasanamBookDetailsRouter);
 
 function startServer(p, attempts = 5) {
   const server = app.listen(p, () => {

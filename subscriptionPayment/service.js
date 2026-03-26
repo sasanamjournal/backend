@@ -166,10 +166,13 @@ const verifyPayment = async (payload, userId) => {
     paymentRecord.verifiedAt = new Date();
 
     await paymentRecord.save();
-    await User.findByIdAndUpdate(userId, { isSubscribed: true }).exec();
+    const updatedUser = await User.findByIdAndUpdate(userId, { isSubscribed: true }, { new: true }).exec();
 
     return {
-      data: paymentRecord.toJSON(),
+      data: {
+        paymentDetails:paymentRecord.toJSON(),
+        user:updatedUser.toJSON(),
+      },
       status: 200,
       error: null
     };

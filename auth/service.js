@@ -21,9 +21,8 @@ const isValidEmail = (email) => {
 const signup = async (fullName, password, email) => {
   const normalizedFullname = normalizeUsername(fullName);
   const normalizedEmail = email ? normalizeEmail(email) : undefined;
-
   if (!normalizedEmail || !password) {
-    return { error: 'fullName and password required', status: 400 };
+    return { error: 'email and password required', status: 400 };
   }
   if (normalizedFullname.length < 3 || normalizedFullname.length > 30) {
     return { error: 'fullName must be 3-30 characters', status: 400 };
@@ -40,7 +39,7 @@ const signup = async (fullName, password, email) => {
 
   const existingUser = await User.findOne({ email: normalizedEmail }).exec();
   if (existingUser) {
-    return { error: 'username already exists', status: 409 };
+    return { error: 'email already exists', status: 409 };
   }
 
   if (normalizedFullname) {
@@ -84,11 +83,12 @@ const login = async (email, password) => {
   const User = makeUserModel(mongoose);
 
   const user = await User.findOne({ email: normalizedEmail }).exec();
+  
   if (!user) return { error: 'invalid credentials', status: 401 };
-  console.log('Found user for login:', user);
+  console.log('Found user for login1:', user);
   const valid = await user.comparePassword(password);
   if (!valid) return { error: 'invalid credentials', status: 401 };
-
+  console.log('Found user for login2:', user);
   const payload = { sub: user._id.toString(), username: user.email };
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
 
