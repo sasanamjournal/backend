@@ -1,11 +1,5 @@
 
-const {
-  createBook: createBookService,
-  getBookById: getBookByIdService,
-  getAllBooks: getAllBooksService,
-  updateBook: updateBookService,
-  deleteBook: deleteBookService
-} = require('./service');
+const service = require('./service');
 
 // Validation middleware
 const validateCreateBook = (req, res, next) => {
@@ -122,158 +116,51 @@ const validateUpdateBook = (req, res, next) => {
   next();
 };
 
-// Handler: Create Book
 const createBook = async (req, res) => {
   try {
-    const result = await createBookService(req.body);
-    if (!result || result.error) {
-      return res.status(result && result.status ? result.status : 400).json({
-        success: false,
-        error: result && result.error ? result.error : 'Failed to create book',
-        code: result && result.status === 409 ? 'DUPLICATE_ENTRY' : 'VALIDATION_ERROR'
-      });
-    }
-    res.status(201).json({
-      success: true,
-      message: 'Book created successfully',
-      data: result
-    });
+    const result = await service.createBook(req.body);
+    res.status(201).json(result);
   } catch (err) {
-    console.error('Create book controller error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
-    });
+    res.status(400).json({ error: err.message });
   }
 };
 
-// Handler: Get Book by ID
 const getBookById = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!id || id.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Book ID is required',
-        code: 'INVALID_REQUEST'
-      });
-    }
-    const result = await getBookByIdService(id);
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        error: 'Book not found',
-        code: 'NOT_FOUND'
-      });
-    }
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    const result = await service.getBookById(req.params.id);
+    if (!result) return res.status(404).json({ error: 'Not found' });
+    res.status(200).json(result);
   } catch (err) {
-    console.error('Get book controller error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
-    });
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Handler: Get All Books
 const getAllBooks = async (req, res) => {
   try {
-    let { limit, page } = req.query;
-    limit = limit ? parseInt(limit, 10) : 300;
-    page = page ? parseInt(page, 10) : 1;
-    if (isNaN(limit) || limit < 1 || isNaN(page) || page < 1) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid limit or page parameters. Must be positive integers.',
-        code: 'INVALID_REQUEST'
-      });
-    }
-    const result = await getAllBooksService(limit, page);
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+    const result = await service.getAllBooks();
+    res.status(200).json(result);
   } catch (err) {
-    console.error('Get all books controller error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
-    });
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Handler: Update Book
 const updateBook = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!id || id.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Book ID is required',
-        code: 'INVALID_REQUEST'
-      });
-    }
-    const result = await updateBookService(id, req.body);
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        error: 'Book not found',
-        code: 'NOT_FOUND'
-      });
-    }
-    res.status(200).json({
-      success: true,
-      message: 'Book updated successfully',
-      data: result
-    });
+    const result = await service.updateBook(req.params.id, req.body);
+    if (!result) return res.status(404).json({ error: 'Not found' });
+    res.status(200).json(result);
   } catch (err) {
-    console.error('Update book controller error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
-    });
+    res.status(400).json({ error: err.message });
   }
 };
 
-// Handler: Delete Book
 const deleteBook = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!id || id.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Book ID is required',
-        code: 'INVALID_REQUEST'
-      });
-    }
-    const result = await deleteBookService(id);
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        error: 'Book not found',
-        code: 'NOT_FOUND'
-      });
-    }
-    res.status(200).json({
-      success: true,
-      message: 'Book deleted successfully',
-      data: result
-    });
+    const result = await service.deleteBook(req.params.id);
+    if (!result) return res.status(404).json({ error: 'Not found' });
+    res.status(204).send();
   } catch (err) {
-    console.error('Delete book controller error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
-    });
+    res.status(500).json({ error: err.message });
   }
 };
 
