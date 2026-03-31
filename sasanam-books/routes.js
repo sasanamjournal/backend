@@ -38,7 +38,7 @@ const controller = require('./controller');
  *       400:
  *         description: Invalid input
  */
-router.post('/', controller.validateCreateBook, controller.createBook);
+router.post('/', controller.createBook);
 
 /**
  * @swagger

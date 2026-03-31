@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('./controller');
+const upload = require('./upload');
 
 /**
  * @swagger
@@ -65,7 +66,7 @@ router.get('/:id', controller.getBookDetailsById);
  *       400:
  *         description: Bad request
  */
-router.post('/', controller.createBookDetails);
+router.post('/', upload.single('file'), controller.createBookDetails);
 
 /**
  * @swagger
