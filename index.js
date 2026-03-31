@@ -17,6 +17,7 @@ const sectionRouter = require('./sasanam-section/routes');
 const booksRouter = require('./sasanam-books/routes');
 const sasanamBookDetailsRouter = require('./sasanam-book-details/routes');
 const userNewsRouter = require('./userNews/routes');
+const aboutRouter = require('./about/routes');
 const connect = require('./db');
 
 const app = express();
@@ -72,7 +73,8 @@ const swaggerBase = {
     './sasanam-section/*.js',
     './sasanam-books/*.js',
     './userNews/*.js',
-    './sasanam-book-details/*.js'
+    './sasanam-book-details/*.js',
+    './about/*.js'
   ]
 };
 
@@ -175,6 +177,7 @@ app.get('/health', (req, res) => {
 
 app.use('/auth', authRouter);
 app.use('/donation-list', donationListRouter);
+app.use('/about', aboutRouter);
 app.use('/subscription-payment', authenticateToken, subscriptionPaymentRouter);
 app.use('/donation-payment', authenticateToken, donationPaymentRouter);
 app.use('/sasanam-section', authenticateToken, sectionRouter);
