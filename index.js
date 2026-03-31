@@ -76,6 +76,94 @@ const swaggerBase = {
   ]
 };
 
+// Swagger password protection
+const SWAGGER_PASSWORD = process.env.SWAGGER_PASSWORD || 'sasanam@123';
+const crypto = require('crypto');
+const swaggerTokenSecret = crypto.randomBytes(32).toString('hex');
+
+function generateSwaggerToken() {
+  const expires = Date.now() + 24 * 60 * 60 * 1000;
+  const payload = expires.toString();
+  const hmac = crypto.createHmac('sha256', swaggerTokenSecret).update(payload).digest('hex');
+  return `${payload}.${hmac}`;
+}
+
+function verifySwaggerToken(token) {
+  if (!token) return false;
+  const [payload, hmac] = token.split('.');
+  if (!payload || !hmac) return false;
+  const expected = crypto.createHmac('sha256', swaggerTokenSecret).update(payload).digest('hex');
+  if (hmac !== expected) return false;
+  return Date.now() < parseInt(payload, 10);
+}
+
+function getSwaggerCookie(req) {
+  const cookie = (req.headers.cookie || '').split(';').map(c => c.trim()).find(c => c.startsWith('swagger_token='));
+  return cookie ? cookie.split('=')[1] : null;
+}
+
+function swaggerAuth(req, res, next) {
+  if (verifySwaggerToken(getSwaggerCookie(req))) return next();
+  return res.redirect('/api-docs');
+}
+
+function buildLoginHTML(error) {
+  const errorMsg = error ? '<p style="color:#e94560;text-align:center;margin-top:12px;font-size:14px;">Incorrect password. Try again.</p>' : '';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sasanam API Docs - Login</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .container { background: #16213e; padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); width: 100%; max-width: 400px; }
+    h1 { color: #e94560; text-align: center; margin-bottom: 8px; font-size: 24px; }
+    .subtitle { color: #a8a8b3; text-align: center; margin-bottom: 24px; font-size: 14px; }
+    .input-group { margin-bottom: 20px; }
+    label { display: block; color: #e2e2e2; margin-bottom: 6px; font-size: 14px; }
+    input { width: 100%; padding: 12px 16px; border: 1px solid #0f3460; border-radius: 8px; background: #1a1a2e; color: #fff; font-size: 16px; outline: none; }
+    input:focus { border-color: #e94560; }
+    button { width: 100%; padding: 12px; background: #e94560; color: #fff; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    button:hover { background: #c73652; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Sasanam API</h1>
+    <p class="subtitle">Enter password to access API documentation</p>
+    <form method="POST" action="/api-docs/login">
+      <div class="input-group">
+        <label for="password">Password</label>
+        <input type="password" name="password" id="password" placeholder="Enter password" autofocus required />
+      </div>
+      <button type="submit">Access Docs</button>
+      ${errorMsg}
+    </form>
+  </div>
+</body>
+</html>`;
+}
+
+// Parse URL-encoded form bodies for swagger login
+app.use('/api-docs/login', express.urlencoded({ extended: false }));
+
+app.get('/api-docs', (req, res) => {
+  if (verifySwaggerToken(getSwaggerCookie(req))) return res.redirect('/api-docs/ui');
+  res.send(buildLoginHTML(false));
+});
+
+app.post('/api-docs/login', (req, res) => {
+  const password = req.body && req.body.password;
+  if (password === SWAGGER_PASSWORD) {
+    const token = generateSwaggerToken();
+    res.setHeader('Set-Cookie', `swagger_token=${token}; Path=/; HttpOnly; Max-Age=86400; SameSite=Strict`);
+    return res.redirect('/api-docs/ui');
+  }
+  res.send(buildLoginHTML(true));
+});
+
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Sasanam API' });
 });
@@ -94,6 +182,10 @@ app.use('/sasanam-books', authenticateToken, booksRouter);
 
 app.use('/user-news', authenticateToken, userNewsRouter);
 app.use('/sasanam-book-details', authenticateToken, sasanamBookDetailsRouter);
+
+// Swagger UI (password-protected) - must be before 404 handler
+const swaggerRouter = express.Router();
+app.use('/api-docs/ui', swaggerAuth, swaggerRouter);
 
 // 404 handler for unknown routes
 app.use((req, res) => {
@@ -119,7 +211,7 @@ function startServer(p, attempts = 5) {
       })
     });
     const swaggerSpec = swaggerJsdoc(swaggerOptions);
-    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+    swaggerRouter.use(swaggerUi.serve, swaggerUi.setup(swaggerSpec));
     console.log(`Swagger docs available at http://localhost:${p}/api-docs`);
   });
 
