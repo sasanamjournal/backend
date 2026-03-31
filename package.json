@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "seed": "node seed-user.js"
+    "seed": "node seed-user.js",
+    "setup": "npm install && node seed-user.js && node index.js",
+    "build": "npm install --production"
   },
   "keywords": ["sasanam", "api", "express"],
   "author": "Sasanam",

@@ -3,7 +3,8 @@ const connect = require('./db');
 const mongoose = require('mongoose');
 const makeUserModel = require('./auth/schema');
 
-const username = process.env.SEED_USERNAME || 'test@example.com';
+const fullName = process.env.SEED_FULLNAME || 'admin';
+const email = process.env.SEED_EMAIL || 'admin@sasanam.com';
 const password = process.env.SEED_PASSWORD || 'Password123!';
 
 async function run() {
@@ -11,20 +12,22 @@ async function run() {
     await connect();
     const User = makeUserModel(mongoose);
 
-    const existing = await User.findOne({ username }).exec();
+    const existing = await User.findOne({ email }).exec();
     if (existing) {
-      console.log('User already exists:', username);
+      console.log('User already exists:', email);
       await mongoose.disconnect();
       process.exit(0);
     }
 
-    const user = new User({ username, passwordHash: password });
+    const user = new User({ fullName, email, passwordHash: password, isSubscribed: false });
     await user.save();
-    console.log('Created user:', username);
+    console.log('Seed user created successfully!');
+    console.log('  Email:', email);
+    console.log('  Password:', password);
     await mongoose.disconnect();
     process.exit(0);
   } catch (err) {
-    console.error('Seed error:', err);
+    console.error('Seed error:', err.message);
     try { await mongoose.disconnect(); } catch (e) {}
     process.exit(1);
   }
