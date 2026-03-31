@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
@@ -16,9 +19,23 @@ const userNewsRouter = require('./userNews/routes');
 const connect = require('./db');
 
 const app = express();
+
+// Security & performance middleware
+app.use(helmet());
+app.use(compression());
 app.use(cors());
-app.use(express.json());
-app.use(morgan('dev'));
+app.use(express.json({ limit: '10mb' }));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// Rate limiting - 100 requests per 15 minutes per IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' }
+});
+app.use('/auth', limiter);
 
 const port = process.env.PORT || 3000;
 
@@ -26,9 +43,9 @@ const swaggerBase = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Express Swagger API',
+      title: 'Sasanam API',
       version: '1.0.0',
-      description: 'A simple Express API documented with Swagger'
+      description: 'Sasanam Document Backend API'
     },
     components: {
       securitySchemes: {
@@ -59,7 +76,12 @@ const swaggerBase = {
 };
 
 app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to Express + Swagger' });
+  res.json({ message: 'Welcome to Sasanam API' });
+});
+
+// Health check endpoint for deployment platforms
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
 app.use('/auth', authRouter);
@@ -72,8 +94,10 @@ app.use('/sasanam-books', authenticateToken, booksRouter);
 app.use('/user-news', authenticateToken, userNewsRouter);
 app.use('/sasanam-book-details', authenticateToken, sasanamBookDetailsRouter);
 
+let activeServer;
 function startServer(p, attempts = 5) {
   const server = app.listen(p, () => {
+    activeServer = server;
     console.log(`Server listening on port ${p}`);
     const swaggerOptions = Object.assign({}, swaggerBase, {
       definition: Object.assign({}, swaggerBase.definition, {
@@ -107,6 +131,26 @@ async function init() {
   try {
     await connect();
     startServer(parsedPort);
+
+    // Graceful shutdown
+    const shutdown = (signal) => {
+      console.log(`\n${signal} received. Shutting down gracefully...`);
+      if (!activeServer) process.exit(0);
+      activeServer.close(() => {
+        const mongoose = require('mongoose');
+        mongoose.connection.close(false).then(() => {
+          console.log('MongoDB connection closed.');
+          process.exit(0);
+        });
+      });
+      setTimeout(() => {
+        console.error('Forced shutdown after timeout.');
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (err) {
     console.error('Failed to connect to MongoDB on startup. Exiting.');
     process.exit(1);

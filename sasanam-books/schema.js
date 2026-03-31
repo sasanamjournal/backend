@@ -14,7 +14,7 @@ const BooksSchema = new mongoose.Schema({
     ref: 'Section',
     required: true
   }
-});
+}, { timestamps: true });
 
 const Books = mongoose.model('Books', BooksSchema);
 

@@ -85,10 +85,8 @@ const login = async (email, password) => {
   const user = await User.findOne({ email: normalizedEmail }).exec();
   
   if (!user) return { error: 'invalid credentials', status: 401 };
-  console.log('Found user for login1:', user);
   const valid = await user.comparePassword(password);
   if (!valid) return { error: 'invalid credentials', status: 401 };
-  console.log('Found user for login2:', user);
   const payload = { sub: user._id.toString(), username: user.email };
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
 

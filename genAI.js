@@ -5,11 +5,16 @@
 // Example: Using fetch for REST API (update with real endpoint and API key)
 const fetch = require('node-fetch');
 
+require('dotenv').config();
+
 // Use the official Google Gemini API endpoint and your API key
-const API_KEY = "AIzaSyDLcKo-9pkZAsPniFUmqTEVJ1HYeKuTXzA"; // Gemini key (optional)
-const GEMINI_MODEL = "gemini-2.5-flash"; // or gemini-1.5-turbo etc.
+const API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 function getGenerativeModel({ model }) {
+  if (!API_KEY) {
+    throw new Error('Missing GEMINI_API_KEY in environment variables');
+  }
   return {
     async generateContent(inputs) {
       // inputs: [prompt, { inlineData: { data, mimeType } }]
