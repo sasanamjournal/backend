@@ -62,10 +62,29 @@ function getGenerativeModel({ model }) {
         req.write(payload);
         req.end();
       });
-      // Simulate Gemini SDK's response structure
+      // Parse the Gemini API JSON envelope and extract generated text
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (e) {
+        throw new Error('Failed to parse Gemini API response: ' + e.message);
+      }
+
+      const generatedText =
+        parsed.candidates &&
+        parsed.candidates[0] &&
+        parsed.candidates[0].content &&
+        parsed.candidates[0].content.parts &&
+        parsed.candidates[0].content.parts[0] &&
+        parsed.candidates[0].content.parts[0].text;
+
+      if (!generatedText) {
+        throw new Error('No text in Gemini API response');
+      }
+
       return {
         response: {
-          text: () => text
+          text: () => generatedText
         }
       };
     }

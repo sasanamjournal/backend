@@ -5,14 +5,7 @@ const connect = require('../db');
 const makeRazorpayPaymentModel = require('./schema');
 const makeUserModel = require('../auth/schema');
 
-class AppError extends Error {
-  constructor(message, statusCode) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = true;
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
+const AppError = require('../utils/AppError');
 
 const getRazorpayClient = () => {
   const keyId = process.env.RAZORPAY_KEY_ID;

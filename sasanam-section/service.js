@@ -1,15 +1,7 @@
 const connect = require('../db');
 const mongoose = require('mongoose');
 const makeSection = require('./schema');
-
-class AppError extends Error {
-  constructor(message, statusCode) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = true;
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
+const AppError = require('../utils/AppError');
 
 async function createSection(data) {
   try {

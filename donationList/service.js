@@ -1,15 +1,7 @@
 const mongoose = require('mongoose');
 const connect = require('../db');
 const makeDonationListModel = require('./schema');
-
-class AppError extends Error {
-  constructor(message, statusCode) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = true;
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
+const AppError = require('../utils/AppError');
 
 async function getAllDonations(limit = 20, page = 1) {
   try {

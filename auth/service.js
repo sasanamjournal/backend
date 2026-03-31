@@ -3,7 +3,10 @@ const connect = require('../db');
 const mongoose = require('mongoose');
 const makeUserModel = require('./schema');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
 const TOKEN_EXPIRES_IN = process.env.TOKEN_EXPIRES_IN || '10d';
 
 const normalizeUsername = (username) => {
@@ -59,11 +62,6 @@ const signup = async (fullName, password, email) => {
     await user.save();
 
     return {
-      // userDetails:{
-      //   userId:user._id,
-      //   fullName:user.fullName,
-      //   isSubscribed:user.isSubscribed
-      // },
       success: true,
       status: 201,
     };

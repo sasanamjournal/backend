@@ -2,15 +2,7 @@
 const connect = require('../db');
 const mongoose = require('mongoose');
 const Books = require('./schema');
-
-class AppError extends Error {
-  constructor(message, statusCode) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = true;
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
+const AppError = require('../utils/AppError');
 
 async function createBook(data) {
   try {
@@ -81,7 +73,6 @@ async function getBookById(id) {
     }
     await connect();
     const books = await Books.find({ sectionId: id }).exec();
-    console.log("books", books);
     if (!books || books.length === 0) {
       throw new AppError('Book not found', 404);
     }

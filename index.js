@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -93,6 +94,19 @@ app.use('/sasanam-books', authenticateToken, booksRouter);
 
 app.use('/user-news', authenticateToken, userNewsRouter);
 app.use('/sasanam-book-details', authenticateToken, sasanamBookDetailsRouter);
+
+// 404 handler for unknown routes
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: 'Route not found' });
+});
+
+// Global error handler
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err);
+  const status = err.statusCode || 500;
+  const message = err.isOperational ? err.message : 'Internal server error';
+  res.status(status).json({ success: false, error: message });
+});
 
 let activeServer;
 function startServer(p, attempts = 5) {

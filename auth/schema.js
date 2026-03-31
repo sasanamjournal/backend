@@ -18,7 +18,9 @@ const userSchema = new Schema({
   },
   email: {
     type: String,
-    sparse: true,
+    required: true,
+    unique: true,
+    trim: true,
     lowercase: true
   },
   isSubscribed: {
@@ -43,10 +45,13 @@ userSchema.methods.comparePassword = async function(plainPassword) {
 };
 
 userSchema.methods.generateAuthToken = function() {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
   const token = jwt.sign(
-    { id: this._id, username: this.username },
-    process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '7d' }
+    { sub: this._id.toString(), username: this.email },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.TOKEN_EXPIRES_IN || '10d' }
   );
   return token;
 };

@@ -1,14 +1,7 @@
 const mongoose = require('mongoose');
 const connect = require('../db');
 const makeUserNewsModel = require('./schema');
-
-class AppError extends Error {
-  constructor(message, statusCode) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = true;
-  }
-}
+const AppError = require('../utils/AppError');
 
 async function getAllNews(limit = 20, page = 1) {
   try {
