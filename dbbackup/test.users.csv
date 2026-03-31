@@ -1,0 +1,4 @@
+_id,fullName,passwordHash,email,isSubscribed,createdAt,updatedAt,__v
+69c8a5f99f6c2525093aeebc,hari@123,$2a$10$aKD0zBIJ142tbkyh1XXN5ePmyy2dJrWhAPpGKnp23V9Q/6ZMBeSiy,hari@gmail.com,false,2026-03-29T04:09:29.726Z,2026-03-29T04:09:29.726Z,0
+69c942a99e79ad17512ae72c,new user,$2a$10$kUi6NdfQFg4VJXzS/xN3cuncs0vjUvL3LQQZruo/URbzE6kRlAHIu,newuser@gamil.com,false,2026-03-29T15:18:01.407Z,2026-03-29T15:18:01.407Z,0
+69ca8cc38a80a1edbfcf2e6f,newuser,$2a$10$xb5JO1K7B8Od39vxANeDDe9z0Gnz5g74U0dAMkM7TmUCY/WNYDYHa,newuser2@gamil.com,false,2026-03-30T14:46:27.112Z,2026-03-30T14:46:27.112Z,0
