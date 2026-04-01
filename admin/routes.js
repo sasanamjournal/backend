@@ -330,7 +330,7 @@ router.post('/payments/refund/:paymentId', async (req, res) => {
     const refundAmount = amount || payment.amount;
 
     const refund = await razorpay.payments.refund(paymentId, {
-      amount: refundAmount * 100, // Razorpay expects paise
+      amount: refundAmount, // amount is already stored in paise
     });
 
     payment.status = 'failed';
