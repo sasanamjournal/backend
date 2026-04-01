@@ -85,14 +85,15 @@ const login = async (email, password) => {
   if (!user) return { error: 'invalid credentials', status: 401 };
   const valid = await user.comparePassword(password);
   if (!valid) return { error: 'invalid credentials', status: 401 };
-  const payload = { sub: user._id.toString(), username: user.email };
+  const payload = { sub: user._id.toString(), username: user.email, role: user.role || 'user' };
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
 
-  return { token, expiresIn: TOKEN_EXPIRES_IN, 
-   user:{
-      username: user.email, isSubscribed: user.isSubscribed,
-   },
-    status: 200 };
+  return {
+    token,
+    expiresIn: TOKEN_EXPIRES_IN,
+    user: user.toJSON(),
+    status: 200
+  };
 };
 
 module.exports = { login, signup };

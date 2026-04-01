@@ -26,6 +26,15 @@ const userSchema = new Schema({
   isSubscribed: {
     type: Boolean,
     default: false
+  },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
+  canDownload: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 

@@ -18,6 +18,7 @@ const booksRouter = require('./sasanam-books/routes');
 const sasanamBookDetailsRouter = require('./sasanam-book-details/routes');
 const userNewsRouter = require('./userNews/routes');
 const aboutRouter = require('./about/routes');
+const adminRouter = require('./admin/routes');
 const connect = require('./db');
 
 const app = express();
@@ -185,6 +186,7 @@ app.use('/sasanam-books', authenticateToken, booksRouter);
 
 app.use('/user-news', authenticateToken, userNewsRouter);
 app.use('/sasanam-book-details', authenticateToken, sasanamBookDetailsRouter);
+app.use('/admin', adminRouter);
 
 // Swagger UI (password-protected) - must be before 404 handler
 const swaggerRouter = express.Router();
