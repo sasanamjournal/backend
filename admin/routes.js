@@ -8,6 +8,11 @@ const makeDonationPaymentModel = require('../donationPayment/schema');
 const makeDonationListModel = require('../donationList/schema');
 const makeUserNewsModel = require('../userNews/schema');
 const { makeTeamMemberModel, makeAuthorModel } = require('../about/schema');
+const makeSectionModel = require('../sasanam-section/schema');
+const Books = require('../sasanam-books/schema');
+const upload = require('../sasanam-books/upload');
+const path = require('path');
+const fs = require('fs');
 const Razorpay = require('razorpay');
 
 const router = express.Router();
@@ -616,6 +621,200 @@ router.delete('/authors/:id', requirePermission('authors.delete'), async (req, r
     if (!author) return res.status(404).json({ error: 'not found' });
     res.json({ success: true, message: 'deleted' });
   } catch (err) {
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// SECTIONS MANAGEMENT (Journal Headers)
+// ═══════════════════════════════════════════
+router.get('/sections', requirePermission('authors.view'), async (req, res) => {
+  try {
+    const Section = makeSectionModel(mongoose);
+    const sections = await Section.find().sort({ createdAt: -1 }).lean();
+    // Count books per section
+    const sectionIds = sections.map(s => s._id);
+    const bookCounts = await Books.aggregate([
+      { $match: { sectionId: { $in: sectionIds } } },
+      { $group: { _id: '$sectionId', count: { $sum: 1 } } }
+    ]);
+    const countMap = {};
+    bookCounts.forEach(b => { countMap[b._id.toString()] = b.count; });
+    const data = sections.map(s => ({ ...s, bookCount: countMap[s._id.toString()] || 0 }));
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Get sections error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.post('/sections', requirePermission('authors.create'), async (req, res) => {
+  try {
+    const Section = makeSectionModel(mongoose);
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Section name is required' });
+    const existing = await Section.findOne({ name: name.trim() }).lean();
+    if (existing) return res.status(409).json({ error: 'Section name already exists' });
+    const section = new Section({ name: name.trim() });
+    await section.save();
+    res.status(201).json({ success: true, data: section });
+  } catch (err) {
+    console.error('Create section error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.put('/sections/:id', requirePermission('authors.update'), async (req, res) => {
+  try {
+    const Section = makeSectionModel(mongoose);
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Section name is required' });
+    const duplicate = await Section.findOne({ name: name.trim(), _id: { $ne: req.params.id } }).lean();
+    if (duplicate) return res.status(409).json({ error: 'Section name already exists' });
+    const section = await Section.findByIdAndUpdate(req.params.id, { name: name.trim() }, { new: true });
+    if (!section) return res.status(404).json({ error: 'not found' });
+    res.json({ success: true, data: section });
+  } catch (err) {
+    console.error('Update section error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.delete('/sections/:id', requirePermission('authors.delete'), async (req, res) => {
+  try {
+    const Section = makeSectionModel(mongoose);
+    // Check if section has books
+    const bookCount = await Books.countDocuments({ sectionId: req.params.id });
+    if (bookCount > 0) return res.status(400).json({ error: `Cannot delete section with ${bookCount} book(s). Delete the books first.` });
+    const section = await Section.findByIdAndDelete(req.params.id);
+    if (!section) return res.status(404).json({ error: 'not found' });
+    res.json({ success: true, message: 'deleted' });
+  } catch (err) {
+    console.error('Delete section error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// BOOKS MANAGEMENT (with PDF + Cover Image upload)
+// ═══════════════════════════════════════════
+router.get('/books', requirePermission('authors.view'), async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const filter = {};
+    if (req.query.sectionId) filter.sectionId = req.query.sectionId;
+    if (req.query.search) filter.bookName = { $regex: req.query.search, $options: 'i' };
+
+    const [books, total] = await Promise.all([
+      Books.find(filter).populate('sectionId', 'name').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Books.countDocuments(filter),
+    ]);
+    res.json({ success: true, data: { books, total, page, limit, totalPages: Math.ceil(total / limit) } });
+  } catch (err) {
+    console.error('Get books error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.post('/books', requirePermission('authors.create'), upload.fields([
+  { name: 'pdfFile', maxCount: 1 },
+  { name: 'coverImage', maxCount: 1 },
+]), async (req, res) => {
+  try {
+    const { bookName, authorName, sectionId, description } = req.body;
+    if (!bookName || !authorName || !sectionId) {
+      return res.status(400).json({ error: 'bookName, authorName, and sectionId are required' });
+    }
+
+    const bookData = {
+      bookName: bookName.trim(),
+      authorName: authorName.trim(),
+      sectionId,
+      description: (description || '').trim(),
+    };
+
+    if (req.files && req.files.pdfFile && req.files.pdfFile[0]) {
+      bookData.pdfFile = req.files.pdfFile[0].filename;
+    }
+    if (req.files && req.files.coverImage && req.files.coverImage[0]) {
+      bookData.coverImage = req.files.coverImage[0].filename;
+    }
+
+    const book = new Books(bookData);
+    await book.save();
+    const populated = await Books.findById(book._id).populate('sectionId', 'name').lean();
+    res.status(201).json({ success: true, data: populated });
+  } catch (err) {
+    console.error('Create book error:', err);
+    if (err.code === 11000) return res.status(409).json({ error: 'Duplicate book' });
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.put('/books/:id', requirePermission('authors.update'), upload.fields([
+  { name: 'pdfFile', maxCount: 1 },
+  { name: 'coverImage', maxCount: 1 },
+]), async (req, res) => {
+  try {
+    const existing = await Books.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'not found' });
+
+    const { bookName, authorName, sectionId, description } = req.body;
+    const update = {};
+    if (bookName !== undefined) update.bookName = bookName.trim();
+    if (authorName !== undefined) update.authorName = authorName.trim();
+    if (sectionId !== undefined) update.sectionId = sectionId;
+    if (description !== undefined) update.description = description.trim();
+
+    const assetDir = path.join(__dirname, '..', 'asset');
+
+    if (req.files && req.files.pdfFile && req.files.pdfFile[0]) {
+      // Delete old PDF if it exists
+      if (existing.pdfFile) {
+        const oldPath = path.join(assetDir, existing.pdfFile);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      update.pdfFile = req.files.pdfFile[0].filename;
+    }
+    if (req.files && req.files.coverImage && req.files.coverImage[0]) {
+      // Delete old cover image if it exists
+      if (existing.coverImage) {
+        const oldPath = path.join(assetDir, existing.coverImage);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      update.coverImage = req.files.coverImage[0].filename;
+    }
+
+    const book = await Books.findByIdAndUpdate(req.params.id, update, { new: true }).populate('sectionId', 'name').lean();
+    res.json({ success: true, data: book });
+  } catch (err) {
+    console.error('Update book error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.delete('/books/:id', requirePermission('authors.delete'), async (req, res) => {
+  try {
+    const book = await Books.findById(req.params.id);
+    if (!book) return res.status(404).json({ error: 'not found' });
+
+    // Delete associated files
+    const assetDir = path.join(__dirname, '..', 'asset');
+    if (book.pdfFile) {
+      const pdfPath = path.join(assetDir, book.pdfFile);
+      if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+    }
+    if (book.coverImage) {
+      const imgPath = path.join(assetDir, book.coverImage);
+      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+    }
+
+    await Books.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'deleted' });
+  } catch (err) {
+    console.error('Delete book error:', err);
     res.status(500).json({ error: 'internal server error' });
   }
 });
