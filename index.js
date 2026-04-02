@@ -24,7 +24,9 @@ const connect = require('./db');
 const app = express();
 
 // Security & performance middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(compression());
 app.use(cors({
   exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],
