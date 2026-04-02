@@ -16,16 +16,16 @@ async function createAdmin() {
     const existing = await User.findOne({ email });
 
     if (existing) {
-      existing.role = 'admin';
+      existing.role = 'super_admin';
       existing.canDownload = true;
-      await User.updateOne({ _id: existing._id }, { $set: { role: 'admin', canDownload: true } });
+      await User.updateOne({ _id: existing._id }, { $set: { role: 'super_admin', canDownload: true } });
       console.log(`User "${existing.fullName}" already exists — promoted to admin.`);
     } else {
       const user = new User({
-        fullName: 'admin',
+        fullName: 'super_admin',
         email: email,
         passwordHash: 'test@123',
-        role: 'admin',
+        role: 'super_admin',
         canDownload: true,
         isSubscribed: true,
       });

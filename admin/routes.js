@@ -1,7 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const { requireAdmin } = require('../auth/adminMiddleware');
+const { requireAdmin, requirePermission, flattenPermissions, getRolesFromDB, invalidateRoleCache } = require('../auth/adminMiddleware');
 const makeUserModel = require('../auth/schema');
+const makeRoleModel = require('../auth/roleSchema');
 const makeSubscriptionPaymentModel = require('../subscriptionPayment/schema');
 const makeDonationPaymentModel = require('../donationPayment/schema');
 const makeDonationListModel = require('../donationList/schema');
@@ -11,7 +12,7 @@ const Razorpay = require('razorpay');
 
 const router = express.Router();
 
-// All admin routes require admin auth
+// All admin routes require admin panel access (mentor, admin, super_admin)
 router.use(requireAdmin);
 
 const razorpay = new Razorpay({
@@ -20,9 +21,59 @@ const razorpay = new Razorpay({
 });
 
 // ═══════════════════════════════════════════
+// CURRENT USER PERMISSIONS (for frontend)
+// ═══════════════════════════════════════════
+router.get('/me/permissions', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      role: req.adminUser.role,
+      permissions: req.permissions || [],
+      roleDoc: req.roleDoc || null,
+    },
+  });
+});
+
+// ═══════════════════════════════════════════
+// ROLES MANAGEMENT (from DB)
+// ═══════════════════════════════════════════
+router.get('/roles', async (req, res) => {
+  try {
+    const Role = makeRoleModel(mongoose);
+    const roles = await Role.find().sort({ name: 1 }).lean();
+    res.json({ success: true, data: roles });
+  } catch (err) {
+    console.error('Get roles error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.put('/roles/:id', requirePermission('users.create_admin'), async (req, res) => {
+  try {
+    const Role = makeRoleModel(mongoose);
+    const { permissions, label, description } = req.body;
+    const update = {};
+    if (permissions !== undefined) update.permissions = permissions;
+    if (label !== undefined) update.label = label;
+    if (description !== undefined) update.description = description;
+
+    const role = await Role.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!role) return res.status(404).json({ error: 'role not found' });
+
+    // Clear the cached permissions so changes take effect immediately
+    invalidateRoleCache();
+
+    res.json({ success: true, data: role });
+  } catch (err) {
+    console.error('Update role error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+// ═══════════════════════════════════════════
 // DASHBOARD STATS
 // ═══════════════════════════════════════════
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', requirePermission('dashboard.view'), async (req, res) => {
   try {
     const User = makeUserModel(mongoose);
     const SubscriptionPayment = makeSubscriptionPaymentModel(mongoose);
@@ -52,7 +103,7 @@ router.get('/dashboard', async (req, res) => {
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ isSubscribed: true }),
-      User.countDocuments({ role: 'admin' }),
+      User.countDocuments({ role: { $in: ['admin', 'super_admin'] } }),
       User.countDocuments({ canDownload: true }),
       SubscriptionPayment.countDocuments(),
       SubscriptionPayment.countDocuments({ status: 'paid' }),
@@ -116,7 +167,7 @@ router.get('/dashboard', async (req, res) => {
 // ═══════════════════════════════════════════
 // USER MANAGEMENT
 // ═══════════════════════════════════════════
-router.get('/users', async (req, res) => {
+router.get('/users', requirePermission('users.view'), async (req, res) => {
   try {
     const User = makeUserModel(mongoose);
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -152,12 +203,42 @@ router.get('/users', async (req, res) => {
   }
 });
 
-router.put('/users/:id', async (req, res) => {
+router.put('/users/:id', requirePermission('users.update'), async (req, res) => {
   try {
     const User = makeUserModel(mongoose);
     const { role, canDownload, isSubscribed } = req.body;
+    const currentUserRole = req.adminUser.role;
     const update = {};
-    if (role !== undefined) update.role = role;
+
+    // Role change validation
+    if (role !== undefined) {
+      // Prevent setting a role higher than your own
+      if (role === 'super_admin' && currentUserRole !== 'super_admin') {
+        return res.status(403).json({ error: 'only super_admin can create super_admin' });
+      }
+      if (role === 'admin' && currentUserRole !== 'super_admin') {
+        return res.status(403).json({ error: 'only super_admin can create admin' });
+      }
+      if (role === 'mentor' && !['admin', 'super_admin'].includes(currentUserRole)) {
+        return res.status(403).json({ error: 'only admin or super_admin can create mentor' });
+      }
+
+      // Prevent demoting yourself
+      if (req.params.id === req.adminUser._id.toString() && role !== currentUserRole) {
+        return res.status(403).json({ error: 'cannot change your own role' });
+      }
+
+      // Prevent admin from changing another admin/super_admin's role
+      const targetUser = await User.findById(req.params.id).exec();
+      if (targetUser) {
+        if (['admin', 'super_admin'].includes(targetUser.role) && currentUserRole !== 'super_admin') {
+          return res.status(403).json({ error: 'only super_admin can modify admin roles' });
+        }
+      }
+
+      update.role = role;
+    }
+
     if (canDownload !== undefined) update.canDownload = canDownload;
     if (isSubscribed !== undefined) update.isSubscribed = isSubscribed;
 
@@ -170,9 +251,21 @@ router.put('/users/:id', async (req, res) => {
   }
 });
 
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/:id', requirePermission('users.delete'), async (req, res) => {
   try {
     const User = makeUserModel(mongoose);
+
+    // Prevent deleting yourself
+    if (req.params.id === req.adminUser._id.toString()) {
+      return res.status(403).json({ error: 'cannot delete yourself' });
+    }
+
+    // Prevent non-super_admin from deleting admin/super_admin
+    const targetUser = await User.findById(req.params.id).exec();
+    if (targetUser && ['admin', 'super_admin'].includes(targetUser.role) && req.adminUser.role !== 'super_admin') {
+      return res.status(403).json({ error: 'only super_admin can delete admin accounts' });
+    }
+
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) return res.status(404).json({ error: 'user not found' });
     res.json({ success: true, message: 'user deleted' });
@@ -185,7 +278,7 @@ router.delete('/users/:id', async (req, res) => {
 // ═══════════════════════════════════════════
 // SUBSCRIPTION PAYMENTS
 // ═══════════════════════════════════════════
-router.get('/payments/subscriptions', async (req, res) => {
+router.get('/payments/subscriptions', requirePermission('payments.view'), async (req, res) => {
   try {
     const SubscriptionPayment = makeSubscriptionPaymentModel(mongoose);
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -226,7 +319,7 @@ router.get('/payments/subscriptions', async (req, res) => {
 // ═══════════════════════════════════════════
 // DONATION PAYMENTS
 // ═══════════════════════════════════════════
-router.get('/payments/donations', async (req, res) => {
+router.get('/payments/donations', requirePermission('payments.view'), async (req, res) => {
   try {
     const DonationPayment = makeDonationPaymentModel(mongoose);
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -266,7 +359,7 @@ router.get('/payments/donations', async (req, res) => {
 // ═══════════════════════════════════════════
 // FAILED PAYMENTS (both types combined)
 // ═══════════════════════════════════════════
-router.get('/payments/failed', async (req, res) => {
+router.get('/payments/failed', requirePermission('payments.view'), async (req, res) => {
   try {
     const SubscriptionPayment = makeSubscriptionPaymentModel(mongoose);
     const DonationPayment = makeDonationPaymentModel(mongoose);
@@ -310,9 +403,9 @@ router.get('/payments/failed', async (req, res) => {
 // ═══════════════════════════════════════════
 // REFUND PAYMENT
 // ═══════════════════════════════════════════
-router.post('/payments/refund/:paymentId', async (req, res) => {
+router.post('/payments/refund/:paymentId', requirePermission('payments.refund'), async (req, res) => {
   try {
-    const { type, amount } = req.body; // type: 'subscription' | 'donation'
+    const { type, amount } = req.body;
     const { paymentId } = req.params;
 
     if (!type || !['subscription', 'donation'].includes(type)) {
@@ -330,13 +423,12 @@ router.post('/payments/refund/:paymentId', async (req, res) => {
     const refundAmount = amount || payment.amount;
 
     const refund = await razorpay.payments.refund(paymentId, {
-      amount: refundAmount, // amount is already stored in paise
+      amount: refundAmount,
     });
 
     payment.status = 'failed';
     await payment.save();
 
-    // If subscription refund, remove subscription
     if (type === 'subscription' && payment.userId) {
       const User = makeUserModel(mongoose);
       await User.findByIdAndUpdate(payment.userId, { isSubscribed: false });
@@ -352,7 +444,7 @@ router.post('/payments/refund/:paymentId', async (req, res) => {
 // ═══════════════════════════════════════════
 // DONATION LIST MANAGEMENT
 // ═══════════════════════════════════════════
-router.get('/donation-list', async (req, res) => {
+router.get('/donation-list', requirePermission('donations.view'), async (req, res) => {
   try {
     const DonationList = makeDonationListModel(mongoose);
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -370,7 +462,7 @@ router.get('/donation-list', async (req, res) => {
   }
 });
 
-router.delete('/donation-list/:id', async (req, res) => {
+router.delete('/donation-list/:id', requirePermission('donations.delete'), async (req, res) => {
   try {
     const DonationList = makeDonationListModel(mongoose);
     const item = await DonationList.findByIdAndDelete(req.params.id);
@@ -384,7 +476,7 @@ router.delete('/donation-list/:id', async (req, res) => {
 // ═══════════════════════════════════════════
 // NEWS MANAGEMENT
 // ═══════════════════════════════════════════
-router.get('/news', async (req, res) => {
+router.get('/news', requirePermission('news.view'), async (req, res) => {
   try {
     const UserNews = makeUserNewsModel(mongoose);
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -402,7 +494,7 @@ router.get('/news', async (req, res) => {
   }
 });
 
-router.post('/news', async (req, res) => {
+router.post('/news', requirePermission('news.create'), async (req, res) => {
   try {
     const UserNews = makeUserNewsModel(mongoose);
     const { title, content, category, imageUrl, isPublished, author } = req.body;
@@ -414,7 +506,7 @@ router.post('/news', async (req, res) => {
   }
 });
 
-router.put('/news/:id', async (req, res) => {
+router.put('/news/:id', requirePermission('news.update'), async (req, res) => {
   try {
     const UserNews = makeUserNewsModel(mongoose);
     const news = await UserNews.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -425,7 +517,7 @@ router.put('/news/:id', async (req, res) => {
   }
 });
 
-router.delete('/news/:id', async (req, res) => {
+router.delete('/news/:id', requirePermission('news.delete'), async (req, res) => {
   try {
     const UserNews = makeUserNewsModel(mongoose);
     const news = await UserNews.findByIdAndDelete(req.params.id);
@@ -439,7 +531,7 @@ router.delete('/news/:id', async (req, res) => {
 // ═══════════════════════════════════════════
 // TEAM MANAGEMENT
 // ═══════════════════════════════════════════
-router.get('/team', async (req, res) => {
+router.get('/team', requirePermission('team.view'), async (req, res) => {
   try {
     const TeamMember = makeTeamMemberModel(mongoose);
     const members = await TeamMember.find().sort({ order: 1 });
@@ -449,7 +541,7 @@ router.get('/team', async (req, res) => {
   }
 });
 
-router.post('/team', async (req, res) => {
+router.post('/team', requirePermission('team.create'), async (req, res) => {
   try {
     const TeamMember = makeTeamMemberModel(mongoose);
     const member = new TeamMember(req.body);
@@ -460,7 +552,7 @@ router.post('/team', async (req, res) => {
   }
 });
 
-router.put('/team/:id', async (req, res) => {
+router.put('/team/:id', requirePermission('team.update'), async (req, res) => {
   try {
     const TeamMember = makeTeamMemberModel(mongoose);
     const member = await TeamMember.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -471,7 +563,7 @@ router.put('/team/:id', async (req, res) => {
   }
 });
 
-router.delete('/team/:id', async (req, res) => {
+router.delete('/team/:id', requirePermission('team.delete'), async (req, res) => {
   try {
     const TeamMember = makeTeamMemberModel(mongoose);
     const member = await TeamMember.findByIdAndDelete(req.params.id);
@@ -485,7 +577,7 @@ router.delete('/team/:id', async (req, res) => {
 // ═══════════════════════════════════════════
 // AUTHOR MANAGEMENT
 // ═══════════════════════════════════════════
-router.get('/authors', async (req, res) => {
+router.get('/authors', requirePermission('authors.view'), async (req, res) => {
   try {
     const Author = makeAuthorModel(mongoose);
     const authors = await Author.find().sort({ order: 1 });
@@ -495,7 +587,7 @@ router.get('/authors', async (req, res) => {
   }
 });
 
-router.post('/authors', async (req, res) => {
+router.post('/authors', requirePermission('authors.create'), async (req, res) => {
   try {
     const Author = makeAuthorModel(mongoose);
     const author = new Author(req.body);
@@ -506,7 +598,7 @@ router.post('/authors', async (req, res) => {
   }
 });
 
-router.put('/authors/:id', async (req, res) => {
+router.put('/authors/:id', requirePermission('authors.update'), async (req, res) => {
   try {
     const Author = makeAuthorModel(mongoose);
     const author = await Author.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -517,7 +609,7 @@ router.put('/authors/:id', async (req, res) => {
   }
 });
 
-router.delete('/authors/:id', async (req, res) => {
+router.delete('/authors/:id', requirePermission('authors.delete'), async (req, res) => {
   try {
     const Author = makeAuthorModel(mongoose);
     const author = await Author.findByIdAndDelete(req.params.id);
@@ -531,7 +623,7 @@ router.delete('/authors/:id', async (req, res) => {
 // ═══════════════════════════════════════════
 // PAYMENT DETAILS - Single payment lookup
 // ═══════════════════════════════════════════
-router.get('/payments/:type/:id', async (req, res) => {
+router.get('/payments/:type/:id', requirePermission('payments.view'), async (req, res) => {
   try {
     const { type, id } = req.params;
     const Model = type === 'subscription'
@@ -541,7 +633,6 @@ router.get('/payments/:type/:id', async (req, res) => {
     const payment = await Model.findById(id).populate('userId', 'fullName email');
     if (!payment) return res.status(404).json({ error: 'payment not found' });
 
-    // Try to fetch Razorpay payment details if paymentId exists
     let razorpayDetails = null;
     if (payment.paymentId) {
       try {

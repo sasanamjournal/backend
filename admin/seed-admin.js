@@ -25,11 +25,17 @@ async function seedAdmin() {
       process.exit(1);
     }
 
-    user.role = 'admin';
+    const targetRole = process.argv[3] || 'super_admin';
+    if (!['mentor', 'admin', 'super_admin'].includes(targetRole)) {
+      console.error(`Invalid role "${targetRole}". Use: mentor, admin, or super_admin`);
+      process.exit(1);
+    }
+
+    user.role = targetRole;
     user.canDownload = true;
     await user.save();
 
-    console.log(`Successfully promoted "${user.fullName}" (${user.email}) to admin.`);
+    console.log(`Successfully promoted "${user.fullName}" (${user.email}) to ${targetRole}.`);
     process.exit(0);
   } catch (err) {
     console.error('Error:', err.message);
