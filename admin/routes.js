@@ -9,12 +9,13 @@ const makeDonationListModel = require('../donationList/schema');
 const makeUserNewsModel = require('../userNews/schema');
 const { makeTeamMemberModel, makeAuthorModel } = require('../about/schema');
 const makeSectionModel = require('../sasanam-section/schema');
+// Register the Section model so .populate('sectionId') works
+makeSectionModel(mongoose);
 const Books = require('../sasanam-books/schema');
 const upload = require('../sasanam-books/upload');
-const path = require('path');
-const fs = require('fs');
 const Razorpay = require('razorpay');
 const { upload: imgUpload, saveImage, deleteImage } = require('../utils/imageUpload');
+const { uploadPdf, uploadImage: uploadCoverImage, deleteFromR2 } = require('../utils/r2');
 const ContactMessage = require('../contact/schema');
 const nodemailer = require('nodemailer');
 
@@ -865,10 +866,10 @@ router.post('/books', requirePermission('authors.create'), upload.fields([
     };
 
     if (req.files && req.files.pdfFile && req.files.pdfFile[0]) {
-      bookData.pdfFile = req.files.pdfFile[0].filename;
+      bookData.pdfFile = await uploadPdf(req.files.pdfFile[0].buffer, req.files.pdfFile[0].originalname);
     }
     if (req.files && req.files.coverImage && req.files.coverImage[0]) {
-      bookData.coverImage = req.files.coverImage[0].filename;
+      bookData.coverImage = await uploadCoverImage(req.files.coverImage[0].buffer, req.files.coverImage[0].originalname);
     }
 
     const book = new Books(bookData);
@@ -898,23 +899,13 @@ router.put('/books/:id', requirePermission('authors.update'), upload.fields([
     if (description !== undefined) update.description = description.trim();
     if (bookType !== undefined) update.bookType = bookType === 'fullbook' ? 'fullbook' : 'journal';
 
-    const assetDir = path.join(__dirname, '..', 'asset');
-
     if (req.files && req.files.pdfFile && req.files.pdfFile[0]) {
-      // Delete old PDF if it exists
-      if (existing.pdfFile) {
-        const oldPath = path.join(assetDir, existing.pdfFile);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
-      update.pdfFile = req.files.pdfFile[0].filename;
+      if (existing.pdfFile) await deleteFromR2(existing.pdfFile);
+      update.pdfFile = await uploadPdf(req.files.pdfFile[0].buffer, req.files.pdfFile[0].originalname);
     }
     if (req.files && req.files.coverImage && req.files.coverImage[0]) {
-      // Delete old cover image if it exists
-      if (existing.coverImage) {
-        const oldPath = path.join(assetDir, existing.coverImage);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
-      update.coverImage = req.files.coverImage[0].filename;
+      if (existing.coverImage) await deleteFromR2(existing.coverImage);
+      update.coverImage = await uploadCoverImage(req.files.coverImage[0].buffer, req.files.coverImage[0].originalname);
     }
 
     const book = await Books.findByIdAndUpdate(req.params.id, update, { new: true }).populate('sectionId', 'name').lean();
@@ -930,16 +921,9 @@ router.delete('/books/:id', requirePermission('authors.delete'), async (req, res
     const book = await Books.findById(req.params.id);
     if (!book) return res.status(404).json({ error: 'not found' });
 
-    // Delete associated files
-    const assetDir = path.join(__dirname, '..', 'asset');
-    if (book.pdfFile) {
-      const pdfPath = path.join(assetDir, book.pdfFile);
-      if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
-    }
-    if (book.coverImage) {
-      const imgPath = path.join(assetDir, book.coverImage);
-      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
-    }
+    // Delete associated files from R2
+    if (book.pdfFile) await deleteFromR2(book.pdfFile);
+    if (book.coverImage) await deleteFromR2(book.coverImage);
 
     await Books.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'deleted' });

@@ -1,17 +1,8 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const sharp = require('sharp');
-const crypto = require('crypto');
+const { uploadImage, deleteFromR2, getStreamFromR2, getPublicUrl } = require('./r2');
 
-const UPLOAD_DIR = path.join(__dirname, '..', 'asset', 'uploads');
-
-// Ensure directory exists
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-// Multer memory storage — we process with sharp before saving
+// Multer memory storage — process with sharp then upload to R2
 const storage = multer.memoryStorage();
 
 const fileFilter = (_req, file, cb) => {
@@ -25,72 +16,57 @@ const fileFilter = (_req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
 /**
- * Save uploaded image to disk as optimized JPEG.
- * Returns the filename (relative to UPLOAD_DIR).
+ * Save uploaded image to R2 (optimized JPEG).
+ * Returns the R2 key.
  */
 async function saveImage(buffer, originalName) {
-  const id = crypto.randomBytes(8).toString('hex');
-  const base = path.basename(originalName, path.extname(originalName))
-    .replace(/[^a-zA-Z0-9_\-\s]/g, '')
-    .replace(/\s+/g, '_')
-    .substring(0, 40);
-  const filename = `${base}_${id}.jpg`;
-  const filePath = path.join(UPLOAD_DIR, filename);
-
-  await sharp(buffer)
-    .jpeg({ quality: 85 })
-    .toFile(filePath);
-
-  return filename;
+  return uploadImage(buffer, originalName);
 }
 
 /**
- * Delete an image file from uploads directory.
+ * Delete an image from R2 by key.
  */
-function deleteImage(filename) {
-  if (!filename) return;
-  const filePath = path.join(UPLOAD_DIR, filename);
-  if (!filePath.startsWith(UPLOAD_DIR)) return; // path traversal guard
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
+function deleteImage(key) {
+  return deleteFromR2(key);
 }
 
 /**
  * Serve image with optional resize via ?w= query parameter.
- * Supported widths: 360, 640, 1080, or original.
+ * Streams from R2, resizes on-the-fly if needed.
  */
 async function serveImage(req, res) {
   try {
-    const filename = req.params.filename;
-    if (!filename || filename.includes('..')) {
-      return res.status(400).json({ error: 'invalid filename' });
-    }
-
-    const filePath = path.join(UPLOAD_DIR, filename);
-    if (!filePath.startsWith(UPLOAD_DIR) || !fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'image not found' });
+    const key = req.params[0] || req.params.key;
+    if (!key || key.includes('..')) {
+      return res.status(400).json({ error: 'invalid path' });
     }
 
     const widthParam = parseInt(req.query.w, 10);
     const allowedWidths = [360, 640, 1080];
     const width = allowedWidths.includes(widthParam) ? widthParam : null;
 
+    const result = await getStreamFromR2(`uploads/${key}`);
+    if (!result) return res.status(404).json({ error: 'image not found' });
+
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
 
     if (width) {
-      const resized = await sharp(filePath)
+      // Collect stream, resize, send
+      const chunks = [];
+      for await (const chunk of result.stream) chunks.push(chunk);
+      const buffer = Buffer.concat(chunks);
+      const resized = await sharp(buffer)
         .resize(width, null, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })
         .toBuffer();
       res.send(resized);
     } else {
-      fs.createReadStream(filePath).pipe(res);
+      result.stream.pipe(res);
     }
   } catch (err) {
     console.error('Serve image error:', err);
@@ -98,4 +74,4 @@ async function serveImage(req, res) {
   }
 }
 
-module.exports = { upload, saveImage, deleteImage, serveImage, UPLOAD_DIR };
+module.exports = { upload, saveImage, deleteImage, serveImage, getPublicUrl };

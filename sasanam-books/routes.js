@@ -1,11 +1,10 @@
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
 const mongoose = require('mongoose');
 const router = express.Router();
 const controller = require('./controller');
 const makeUserModel = require('../auth/schema');
 const makeRoleModel = require('../auth/roleSchema');
+const { getStreamFromR2 } = require('../utils/r2');
 
 /**
  * @swagger
@@ -145,7 +144,7 @@ router.put('/:id', controller.validateUpdateBook, controller.updateBook);
 router.delete('/:id', controller.deleteBook);
 
 // ═══════════════════════════════════════════
-// VIEW PDF — streams with range support for fast first-page render
+// VIEW PDF — streams from R2
 // ═══════════════════════════════════════════
 router.get('/:id/view', async (req, res) => {
   try {
@@ -153,44 +152,31 @@ router.get('/:id/view', async (req, res) => {
     const book = await Books.findById(req.params.id).exec();
     if (!book) return res.status(404).json({ error: 'book not found' });
 
-    const pdfFileName = book.pdfFile || '';
-    if (!pdfFileName) return res.status(404).json({ error: 'no PDF file' });
+    const pdfKey = book.pdfFile || '';
+    if (!pdfKey) return res.status(404).json({ error: 'no PDF file' });
 
-    const assetDir = path.join(__dirname, '..', 'asset');
-    const filePath = path.join(assetDir, pdfFileName);
+    const range = req.headers.range || null;
+    const result = await getStreamFromR2(pdfKey, range);
+    if (!result) return res.status(404).json({ error: 'file not found in storage' });
 
-    if (!filePath.startsWith(assetDir)) return res.status(400).json({ error: 'invalid path' });
-
-    let stat;
-    try { stat = fs.statSync(filePath); } catch { return res.status(404).json({ error: 'file not found' }); }
-    const fileSize = stat.size;
-
-    // Support HTTP Range requests so PDF.js can fetch page-by-page
-    const range = req.headers.range;
-    if (range) {
-      const parts = range.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunkSize = end - start + 1;
-
+    if (range && result.contentRange) {
       res.writeHead(206, {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Content-Range': result.contentRange,
         'Accept-Ranges': 'bytes',
-        'Content-Length': chunkSize,
+        'Content-Length': result.contentLength,
         'Content-Type': 'application/pdf',
         'Cache-Control': 'private, max-age=3600',
       });
-      fs.createReadStream(filePath, { start, end }).pipe(res);
     } else {
       res.writeHead(200, {
-        'Content-Length': fileSize,
+        'Content-Length': result.contentLength,
         'Content-Type': 'application/pdf',
         'Accept-Ranges': 'bytes',
-        'Content-Disposition': `inline; filename="${encodeURIComponent(pdfFileName)}"`,
         'Cache-Control': 'private, max-age=3600',
       });
-      fs.createReadStream(filePath, { highWaterMark: 64 * 1024 }).pipe(res);
     }
+
+    result.stream.pipe(res);
   } catch (err) {
     console.error('View PDF error:', err);
     res.status(500).json({ error: 'failed to load PDF' });
@@ -270,22 +256,15 @@ router.get('/:id/download', async (req, res) => {
       }
     }
 
-    // Resolve PDF file path
-    const pdfFileName = book.pdfFile || '';
-    if (!pdfFileName) {
+    // Resolve PDF key
+    const pdfKey = book.pdfFile || '';
+    if (!pdfKey) {
       return res.status(404).json({ error: 'no PDF file associated with this book' });
     }
 
-    const assetDir = path.join(__dirname, '..', 'asset');
-    const filePath = path.join(assetDir, pdfFileName);
-
-    // Security: prevent path traversal
-    if (!filePath.startsWith(assetDir)) {
-      return res.status(400).json({ error: 'invalid file path' });
-    }
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'PDF file not found on server' });
+    const result = await getStreamFromR2(pdfKey);
+    if (!result) {
+      return res.status(404).json({ error: 'PDF file not found in storage' });
     }
 
     // Increment download count for non-unlimited users
@@ -294,9 +273,8 @@ router.get('/:id/download', async (req, res) => {
     }
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(pdfFileName)}"`);
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(pdfKey.split('/').pop() || 'book.pdf')}"`);
+    result.stream.pipe(res);
   } catch (err) {
     console.error('Download error:', err);
     res.status(500).json({ error: 'download failed' });

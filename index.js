@@ -197,7 +197,7 @@ app.use('/admin', adminRouter);
 
 // Image serve route (public, with resize support: ?w=360|640|1080)
 const { serveImage } = require('./utils/imageUpload');
-app.get('/uploads/:filename', serveImage);
+app.get('/uploads/*', serveImage);
 
 // Swagger UI (password-protected) - must be before 404 handler
 const swaggerRouter = express.Router();

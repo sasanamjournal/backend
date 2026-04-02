@@ -1,27 +1,7 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 
-const assetDir = path.join(__dirname, '..', 'asset');
-
-// Ensure asset directory exists
-if (!fs.existsSync(assetDir)) {
-  fs.mkdirSync(assetDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, assetDir),
-  filename: (_req, file, cb) => {
-    // Sanitize original name and add timestamp to avoid collisions
-    const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext)
-      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 80);
-    const uniqueName = `${base}_${Date.now()}${ext}`;
-    cb(null, uniqueName);
-  },
-});
+// Memory storage — files go to R2, not disk
+const storage = multer.memoryStorage();
 
 const fileFilter = (_req, file, cb) => {
   if (file.fieldname === 'pdfFile') {
