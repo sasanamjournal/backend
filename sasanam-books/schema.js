@@ -13,6 +13,22 @@ const BooksSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Section',
     required: true
+  },
+  pdfFile: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  coverImage: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  description: {
+    type: String,
+    default: '',
+    trim: true,
+    maxlength: 500
   }
 }, { timestamps: true });
 

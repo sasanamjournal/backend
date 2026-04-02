@@ -1,6 +1,11 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const mongoose = require('mongoose');
 const router = express.Router();
 const controller = require('./controller');
+const makeUserModel = require('../auth/schema');
+const makeRoleModel = require('../auth/roleSchema');
 
 /**
  * @swagger
@@ -138,5 +143,63 @@ router.put('/:id', controller.validateUpdateBook, controller.updateBook);
  *         description: Book not found
  */
 router.delete('/:id', controller.deleteBook);
+
+// ═══════════════════════════════════════════
+// DOWNLOAD PDF — requires subscription OR role-based download permission
+// ═══════════════════════════════════════════
+router.get('/:id/download', async (req, res) => {
+  try {
+    const Books = require('./schema');
+    const book = await Books.findById(req.params.id).exec();
+    if (!book) return res.status(404).json({ error: 'book not found' });
+
+    // Get current user
+    const User = makeUserModel(mongoose);
+    const user = await User.findById(req.user.sub).exec();
+    if (!user) return res.status(401).json({ error: 'user not found' });
+
+    // Check access: must be subscribed OR have canDownload OR role has frontend.download
+    let hasAccess = user.isSubscribed || user.canDownload;
+
+    if (!hasAccess) {
+      // Check role-based permission
+      const Role = makeRoleModel(mongoose);
+      const roleDoc = await Role.findOne({ name: user.role }).lean();
+      if (roleDoc && roleDoc.permissions && roleDoc.permissions.frontend && roleDoc.permissions.frontend.download) {
+        hasAccess = true;
+      }
+    }
+
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'subscription or download access required' });
+    }
+
+    // Resolve PDF file path
+    const pdfFileName = book.pdfFile || '';
+    if (!pdfFileName) {
+      return res.status(404).json({ error: 'no PDF file associated with this book' });
+    }
+
+    const assetDir = path.join(__dirname, '..', 'asset');
+    const filePath = path.join(assetDir, pdfFileName);
+
+    // Security: prevent path traversal
+    if (!filePath.startsWith(assetDir)) {
+      return res.status(400).json({ error: 'invalid file path' });
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'PDF file not found on server' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(pdfFileName)}"`);
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+  } catch (err) {
+    console.error('Download error:', err);
+    res.status(500).json({ error: 'download failed' });
+  }
+});
 
 module.exports = router;
