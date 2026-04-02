@@ -145,7 +145,7 @@ router.put('/:id', controller.validateUpdateBook, controller.updateBook);
 router.delete('/:id', controller.deleteBook);
 
 // ═══════════════════════════════════════════
-// VIEW PDF — serves PDF inline for browser viewing (no download count)
+// VIEW PDF — streams with range support for fast first-page render
 // ═══════════════════════════════════════════
 router.get('/:id/view', async (req, res) => {
   try {
@@ -160,12 +160,37 @@ router.get('/:id/view', async (req, res) => {
     const filePath = path.join(assetDir, pdfFileName);
 
     if (!filePath.startsWith(assetDir)) return res.status(400).json({ error: 'invalid path' });
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'file not found' });
 
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(pdfFileName)}"`);
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+    let stat;
+    try { stat = fs.statSync(filePath); } catch { return res.status(404).json({ error: 'file not found' }); }
+    const fileSize = stat.size;
+
+    // Support HTTP Range requests so PDF.js can fetch page-by-page
+    const range = req.headers.range;
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunkSize = end - start + 1;
+
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': 'application/pdf',
+        'Cache-Control': 'private, max-age=3600',
+      });
+      fs.createReadStream(filePath, { start, end }).pipe(res);
+    } else {
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type': 'application/pdf',
+        'Accept-Ranges': 'bytes',
+        'Content-Disposition': `inline; filename="${encodeURIComponent(pdfFileName)}"`,
+        'Cache-Control': 'private, max-age=3600',
+      });
+      fs.createReadStream(filePath, { highWaterMark: 64 * 1024 }).pipe(res);
+    }
   } catch (err) {
     console.error('View PDF error:', err);
     res.status(500).json({ error: 'failed to load PDF' });

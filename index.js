@@ -26,7 +26,9 @@ const app = express();
 // Security & performance middleware
 app.use(helmet());
 app.use(compression());
-app.use(cors());
+app.use(cors({
+  exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
