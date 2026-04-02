@@ -39,6 +39,10 @@ const userSchema = new Schema({
   downloadCount: {
     type: Number,
     default: 0
+  },
+  subscriptionEndDate: {
+    type: Date,
+    default: null
   }
 }, { timestamps: true });
 

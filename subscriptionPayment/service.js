@@ -159,7 +159,15 @@ const verifyPayment = async (payload, userId) => {
     paymentRecord.verifiedAt = new Date();
 
     await paymentRecord.save();
-    const updatedUser = await User.findByIdAndUpdate(userId, { isSubscribed: true }, { new: true }).exec();
+
+    // Set subscription end date: 3 years from now
+    const endDate = new Date();
+    endDate.setFullYear(endDate.getFullYear() + 3);
+
+    const updatedUser = await User.findByIdAndUpdate(userId, {
+      isSubscribed: true,
+      subscriptionEndDate: endDate,
+    }, { new: true }).exec();
 
     return {
       data: {

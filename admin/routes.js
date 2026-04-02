@@ -15,6 +15,8 @@ const path = require('path');
 const fs = require('fs');
 const Razorpay = require('razorpay');
 const { upload: imgUpload, saveImage, deleteImage } = require('../utils/imageUpload');
+const ContactMessage = require('../contact/schema');
+const nodemailer = require('nodemailer');
 
 const router = express.Router();
 
@@ -653,6 +655,98 @@ router.delete('/authors/:id', requirePermission('authors.delete'), async (req, r
     const author = await Author.findByIdAndDelete(req.params.id);
     if (!author) return res.status(404).json({ error: 'not found' });
     deleteImage(author.photo);
+    res.json({ success: true, message: 'deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// CONTACT MESSAGES MANAGEMENT
+// ═══════════════════════════════════════════
+router.get('/contacts', requirePermission('news.view'), async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const status = req.query.status || null;
+    const filter = status ? { status } : {};
+
+    const [messages, total] = await Promise.all([
+      ContactMessage.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      ContactMessage.countDocuments(filter),
+    ]);
+    res.json({ success: true, data: { messages, total, page, limit, totalPages: Math.ceil(total / limit) } });
+  } catch (err) {
+    console.error('Get contacts error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.put('/contacts/:id/read', requirePermission('news.view'), async (req, res) => {
+  try {
+    const msg = await ContactMessage.findByIdAndUpdate(req.params.id, { status: 'read' }, { new: true });
+    if (!msg) return res.status(404).json({ error: 'not found' });
+    res.json({ success: true, data: msg });
+  } catch (err) {
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.post('/contacts/:id/reply', requirePermission('news.create'), async (req, res) => {
+  try {
+    const { reply } = req.body;
+    if (!reply || !reply.trim()) return res.status(400).json({ error: 'Reply message is required' });
+
+    const msg = await ContactMessage.findById(req.params.id);
+    if (!msg) return res.status(404).json({ error: 'not found' });
+
+    // Send email reply
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+
+    if (smtpUser && smtpPass) {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+
+      await transporter.sendMail({
+        from: `"Sasanam" <${smtpUser}>`,
+        to: msg.email,
+        subject: `Re: Your message to Sasanam`,
+        html: `
+          <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:20px;">
+            <h2 style="color:#8B4513;">Sasanam</h2>
+            <p>Dear ${msg.name},</p>
+            <p>${reply.replace(/\n/g, '<br>')}</p>
+            <hr style="border:none;border-top:1px solid #e2c9a0;margin:20px 0;">
+            <p style="color:#6A5A4A;font-size:12px;">This is a reply to your message: "${msg.message.substring(0, 100)}..."</p>
+          </div>
+        `,
+      });
+    }
+
+    msg.adminReply = reply.trim();
+    msg.status = 'replied';
+    msg.repliedAt = new Date();
+    await msg.save();
+
+    res.json({ success: true, data: msg });
+  } catch (err) {
+    console.error('Reply contact error:', err);
+    res.status(500).json({ error: 'Failed to send reply' });
+  }
+});
+
+router.delete('/contacts/:id', requirePermission('news.delete'), async (req, res) => {
+  try {
+    const msg = await ContactMessage.findByIdAndDelete(req.params.id);
+    if (!msg) return res.status(404).json({ error: 'not found' });
     res.json({ success: true, message: 'deleted' });
   } catch (err) {
     res.status(500).json({ error: 'internal server error' });

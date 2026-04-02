@@ -180,7 +180,10 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
+const contactRouter = require('./contact/routes');
+
 app.use('/auth', authRouter);
+app.use('/contact', contactRouter);
 app.use('/donation-list', donationListRouter);
 app.use('/about', aboutRouter);
 app.use('/subscription-payment', authenticateToken, subscriptionPaymentRouter);

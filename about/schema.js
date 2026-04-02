@@ -48,6 +48,12 @@ const authorSchema = new Schema({
     trim: true,
     maxlength: 200
   },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: 500,
+    default: ''
+  },
   order: {
     type: Number,
     default: 0
