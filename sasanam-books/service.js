@@ -72,7 +72,7 @@ async function getBookById(id) {
       throw new AppError('Invalid book ID format', 400);
     }
     await connect();
-    const books = await Books.find({ sectionId: id }).exec();
+    const books = await Books.find({ sectionId: id, bookType: { $ne: 'fullbook' } }).exec();
     if (!books || books.length === 0) {
       throw new AppError('Book not found', 404);
     }
@@ -108,12 +108,12 @@ async function getAllBooks(limit = 300, page = 1) {
     }
     await connect();
     const skip = (page - 1) * limit;
-    const books = await Books.find()
+    const books = await Books.find({ bookType: 'fullbook' })
       .limit(limit)
       .skip(skip)
       .sort({ createdAt: -1 })
       .exec();
-    const total = await Books.countDocuments();
+    const total = await Books.countDocuments({ bookType: 'fullbook' });
     return {
       data: {
         books: books.map(b => b.toObject()),

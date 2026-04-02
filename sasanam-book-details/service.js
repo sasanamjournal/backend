@@ -11,8 +11,12 @@ const getAllBookDetails = async () => {
   return await SasanamBookDetails.find().populate('bookid');
 };
 
-// Get book details by ID
+// Get book details by book ID
 const getBookDetailsById = async (id) => {
+  // First try finding by bookid field (the Book's _id)
+  const byBookId = await SasanamBookDetails.findOne({ bookid: id }).populate('bookid');
+  if (byBookId) return byBookId;
+  // Fallback: find by document's own _id
   return await SasanamBookDetails.findById(id).populate('bookid');
 };
 

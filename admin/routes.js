@@ -723,7 +723,7 @@ router.post('/books', requirePermission('authors.create'), upload.fields([
   { name: 'coverImage', maxCount: 1 },
 ]), async (req, res) => {
   try {
-    const { bookName, authorName, sectionId, description } = req.body;
+    const { bookName, authorName, sectionId, description, bookType } = req.body;
     if (!bookName || !authorName || !sectionId) {
       return res.status(400).json({ error: 'bookName, authorName, and sectionId are required' });
     }
@@ -733,6 +733,7 @@ router.post('/books', requirePermission('authors.create'), upload.fields([
       authorName: authorName.trim(),
       sectionId,
       description: (description || '').trim(),
+      bookType: bookType === 'fullbook' ? 'fullbook' : 'journal',
     };
 
     if (req.files && req.files.pdfFile && req.files.pdfFile[0]) {
@@ -761,12 +762,13 @@ router.put('/books/:id', requirePermission('authors.update'), upload.fields([
     const existing = await Books.findById(req.params.id);
     if (!existing) return res.status(404).json({ error: 'not found' });
 
-    const { bookName, authorName, sectionId, description } = req.body;
+    const { bookName, authorName, sectionId, description, bookType } = req.body;
     const update = {};
     if (bookName !== undefined) update.bookName = bookName.trim();
     if (authorName !== undefined) update.authorName = authorName.trim();
     if (sectionId !== undefined) update.sectionId = sectionId;
     if (description !== undefined) update.description = description.trim();
+    if (bookType !== undefined) update.bookType = bookType === 'fullbook' ? 'fullbook' : 'journal';
 
     const assetDir = path.join(__dirname, '..', 'asset');
 

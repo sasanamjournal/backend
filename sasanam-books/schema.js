@@ -29,6 +29,11 @@ const BooksSchema = new mongoose.Schema({
     default: '',
     trim: true,
     maxlength: 500
+  },
+  bookType: {
+    type: String,
+    enum: ['journal', 'fullbook'],
+    default: 'journal'
   }
 }, { timestamps: true });
 

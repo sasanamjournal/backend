@@ -1,6 +1,7 @@
 const connect = require('../db');
 const mongoose = require('mongoose');
 const makeSection = require('./schema');
+const Books = require('../sasanam-books/schema');
 const AppError = require('../utils/AppError');
 
 async function createSection(data) {
@@ -103,12 +104,17 @@ async function getAllSections(limit = 100, page = 1) {
     await connect();
     const Section = makeSection(mongoose);
     const skip = (page - 1) * limit;
-    const sections = await Section.find()
+
+    // Only return sections that have at least one journal book (non-full-book)
+    const sectionIdsWithJournalBooks = await Books.distinct('sectionId', { bookType: { $ne: 'fullbook' } });
+
+    const filter = { _id: { $in: sectionIdsWithJournalBooks } };
+    const sections = await Section.find(filter)
       .limit(limit)
       .skip(skip)
       .sort({ createdAt: -1 })
       .exec();
-    const total = await Section.countDocuments();
+    const total = await Section.countDocuments(filter);
     return { 
       data: {
         sections: sections.map(s => s.toObject()),

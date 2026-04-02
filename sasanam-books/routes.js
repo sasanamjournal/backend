@@ -145,7 +145,73 @@ router.put('/:id', controller.validateUpdateBook, controller.updateBook);
 router.delete('/:id', controller.deleteBook);
 
 // ═══════════════════════════════════════════
-// DOWNLOAD PDF — requires subscription OR role-based download permission
+// VIEW PDF — serves PDF inline for browser viewing (no download count)
+// ═══════════════════════════════════════════
+router.get('/:id/view', async (req, res) => {
+  try {
+    const Books = require('./schema');
+    const book = await Books.findById(req.params.id).exec();
+    if (!book) return res.status(404).json({ error: 'book not found' });
+
+    const pdfFileName = book.pdfFile || '';
+    if (!pdfFileName) return res.status(404).json({ error: 'no PDF file' });
+
+    const assetDir = path.join(__dirname, '..', 'asset');
+    const filePath = path.join(assetDir, pdfFileName);
+
+    if (!filePath.startsWith(assetDir)) return res.status(400).json({ error: 'invalid path' });
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'file not found' });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(pdfFileName)}"`);
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+  } catch (err) {
+    console.error('View PDF error:', err);
+    res.status(500).json({ error: 'failed to load PDF' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// FREE DOWNLOAD LIMIT
+// ═══════════════════════════════════════════
+const FREE_DOWNLOAD_LIMIT = 4;
+
+// ═══════════════════════════════════════════
+// GET DOWNLOAD STATUS — returns user's download info
+// ═══════════════════════════════════════════
+router.get('/download-status/me', async (req, res) => {
+  try {
+    const User = makeUserModel(mongoose);
+    const user = await User.findById(req.user.sub).select('isSubscribed canDownload downloadCount role').exec();
+    if (!user) return res.status(401).json({ error: 'user not found' });
+
+    let unlimitedAccess = user.isSubscribed || user.canDownload;
+    if (!unlimitedAccess) {
+      const Role = makeRoleModel(mongoose);
+      const roleDoc = await Role.findOne({ name: user.role }).lean();
+      if (roleDoc?.permissions?.frontend?.download) unlimitedAccess = true;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        isSubscribed: user.isSubscribed,
+        canDownload: user.canDownload,
+        unlimitedAccess,
+        downloadCount: user.downloadCount || 0,
+        freeLimit: FREE_DOWNLOAD_LIMIT,
+        remaining: unlimitedAccess ? -1 : Math.max(0, FREE_DOWNLOAD_LIMIT - (user.downloadCount || 0)),
+      }
+    });
+  } catch (err) {
+    console.error('Download status error:', err);
+    res.status(500).json({ error: 'failed to get download status' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// DOWNLOAD PDF — 4 free downloads, then subscription required
 // ═══════════════════════════════════════════
 router.get('/:id/download', async (req, res) => {
   try {
@@ -158,20 +224,25 @@ router.get('/:id/download', async (req, res) => {
     const user = await User.findById(req.user.sub).exec();
     if (!user) return res.status(401).json({ error: 'user not found' });
 
-    // Check access: must be subscribed OR have canDownload OR role has frontend.download
-    let hasAccess = user.isSubscribed || user.canDownload;
-
-    if (!hasAccess) {
-      // Check role-based permission
+    // Check if user has unlimited access (subscribed / canDownload / role permission)
+    let unlimitedAccess = user.isSubscribed || user.canDownload;
+    if (!unlimitedAccess) {
       const Role = makeRoleModel(mongoose);
       const roleDoc = await Role.findOne({ name: user.role }).lean();
-      if (roleDoc && roleDoc.permissions && roleDoc.permissions.frontend && roleDoc.permissions.frontend.download) {
-        hasAccess = true;
-      }
+      if (roleDoc?.permissions?.frontend?.download) unlimitedAccess = true;
     }
 
-    if (!hasAccess) {
-      return res.status(403).json({ error: 'subscription or download access required' });
+    // If no unlimited access, check free download limit
+    if (!unlimitedAccess) {
+      const currentCount = user.downloadCount || 0;
+      if (currentCount >= FREE_DOWNLOAD_LIMIT) {
+        return res.status(403).json({
+          error: 'free_limit_reached',
+          message: `You have used all ${FREE_DOWNLOAD_LIMIT} free downloads. Subscribe to download more.`,
+          downloadCount: currentCount,
+          freeLimit: FREE_DOWNLOAD_LIMIT,
+        });
+      }
     }
 
     // Resolve PDF file path
@@ -190,6 +261,11 @@ router.get('/:id/download', async (req, res) => {
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'PDF file not found on server' });
+    }
+
+    // Increment download count for non-unlimited users
+    if (!unlimitedAccess) {
+      await User.findByIdAndUpdate(user._id, { $inc: { downloadCount: 1 } });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
