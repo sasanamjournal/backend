@@ -524,10 +524,15 @@ router.put('/news/:id', requirePermission('news.update'), imgUpload.single('imag
     const existing = await UserNews.findById(req.params.id);
     if (!existing) return res.status(404).json({ error: 'not found' });
     const update = { ...req.body };
+    if (req.body.removeImage === 'true') {
+      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
+      update.imageUrl = '';
+    }
     if (req.file) {
-      deleteImage(existing.imageUrl);
+      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
       update.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
     }
+    delete update.removeImage;
     const news = await UserNews.findByIdAndUpdate(req.params.id, update, { new: true });
     res.json({ success: true, data: news });
   } catch (err) {
@@ -581,10 +586,17 @@ router.put('/team/:id', requirePermission('team.update'), imgUpload.single('phot
     const existing = await TeamMember.findById(req.params.id);
     if (!existing) return res.status(404).json({ error: 'not found' });
     const update = { ...req.body };
+    // Remove photo
+    if (req.body.removePhoto === 'true') {
+      if (existing.photo && !existing.photo.startsWith('http')) deleteImage(existing.photo);
+      update.photo = '';
+    }
+    // Replace photo
     if (req.file) {
-      deleteImage(existing.photo);
+      if (existing.photo && !existing.photo.startsWith('http')) deleteImage(existing.photo);
       update.photo = await saveImage(req.file.buffer, req.file.originalname);
     }
+    delete update.removePhoto;
     const member = await TeamMember.findByIdAndUpdate(req.params.id, update, { new: true });
     res.json({ success: true, data: member });
   } catch (err) {
@@ -638,10 +650,15 @@ router.put('/authors/:id', requirePermission('authors.update'), imgUpload.single
     const existing = await Author.findById(req.params.id);
     if (!existing) return res.status(404).json({ error: 'not found' });
     const update = { ...req.body };
+    if (req.body.removePhoto === 'true') {
+      if (existing.photo && !existing.photo.startsWith('http')) deleteImage(existing.photo);
+      update.photo = '';
+    }
     if (req.file) {
-      deleteImage(existing.photo);
+      if (existing.photo && !existing.photo.startsWith('http')) deleteImage(existing.photo);
       update.photo = await saveImage(req.file.buffer, req.file.originalname);
     }
+    delete update.removePhoto;
     const author = await Author.findByIdAndUpdate(req.params.id, update, { new: true });
     res.json({ success: true, data: author });
   } catch (err) {
