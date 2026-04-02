@@ -190,6 +190,10 @@ app.use('/user-news', authenticateToken, userNewsRouter);
 app.use('/sasanam-book-details', authenticateToken, sasanamBookDetailsRouter);
 app.use('/admin', adminRouter);
 
+// Image serve route (public, with resize support: ?w=360|640|1080)
+const { serveImage } = require('./utils/imageUpload');
+app.get('/uploads/:filename', serveImage);
+
 // Swagger UI (password-protected) - must be before 404 handler
 const swaggerRouter = express.Router();
 app.use('/api-docs/ui', swaggerAuth, swaggerRouter);

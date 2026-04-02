@@ -13,7 +13,11 @@
     "setup": "npm install && node seed-user.js && node index.js",
     "build": "npm install --production"
   },
-  "keywords": ["sasanam", "api", "express"],
+  "keywords": [
+    "sasanam",
+    "api",
+    "express"
+  ],
   "author": "Sasanam",
   "license": "MIT",
   "dependencies": {
@@ -33,6 +37,7 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.5.207",
     "razorpay": "^2.9.6",
+    "sharp": "^0.34.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^4.6.3"
   },

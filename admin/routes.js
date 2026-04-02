@@ -14,6 +14,7 @@ const upload = require('../sasanam-books/upload');
 const path = require('path');
 const fs = require('fs');
 const Razorpay = require('razorpay');
+const { upload: imgUpload, saveImage, deleteImage } = require('../utils/imageUpload');
 
 const router = express.Router();
 
@@ -499,25 +500,35 @@ router.get('/news', requirePermission('news.view'), async (req, res) => {
   }
 });
 
-router.post('/news', requirePermission('news.create'), async (req, res) => {
+router.post('/news', requirePermission('news.create'), imgUpload.single('image'), async (req, res) => {
   try {
     const UserNews = makeUserNewsModel(mongoose);
-    const { title, content, category, imageUrl, isPublished, author } = req.body;
-    const news = new UserNews({ title, content, category, imageUrl, isPublished, author });
+    const { title, content, category, isPublished, author } = req.body;
+    const data = { title, content, category, isPublished, author };
+    if (req.file) data.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+    const news = new UserNews(data);
     await news.save();
     res.status(201).json({ success: true, data: news });
   } catch (err) {
+    console.error('Create news error:', err);
     res.status(500).json({ error: 'internal server error' });
   }
 });
 
-router.put('/news/:id', requirePermission('news.update'), async (req, res) => {
+router.put('/news/:id', requirePermission('news.update'), imgUpload.single('image'), async (req, res) => {
   try {
     const UserNews = makeUserNewsModel(mongoose);
-    const news = await UserNews.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!news) return res.status(404).json({ error: 'not found' });
+    const existing = await UserNews.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'not found' });
+    const update = { ...req.body };
+    if (req.file) {
+      deleteImage(existing.imageUrl);
+      update.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+    }
+    const news = await UserNews.findByIdAndUpdate(req.params.id, update, { new: true });
     res.json({ success: true, data: news });
   } catch (err) {
+    console.error('Update news error:', err);
     res.status(500).json({ error: 'internal server error' });
   }
 });
@@ -527,6 +538,7 @@ router.delete('/news/:id', requirePermission('news.delete'), async (req, res) =>
     const UserNews = makeUserNewsModel(mongoose);
     const news = await UserNews.findByIdAndDelete(req.params.id);
     if (!news) return res.status(404).json({ error: 'not found' });
+    deleteImage(news.imageUrl);
     res.json({ success: true, message: 'deleted' });
   } catch (err) {
     res.status(500).json({ error: 'internal server error' });
@@ -546,24 +558,34 @@ router.get('/team', requirePermission('team.view'), async (req, res) => {
   }
 });
 
-router.post('/team', requirePermission('team.create'), async (req, res) => {
+router.post('/team', requirePermission('team.create'), imgUpload.single('photo'), async (req, res) => {
   try {
     const TeamMember = makeTeamMemberModel(mongoose);
-    const member = new TeamMember(req.body);
+    const data = { ...req.body };
+    if (req.file) data.photo = await saveImage(req.file.buffer, req.file.originalname);
+    const member = new TeamMember(data);
     await member.save();
     res.status(201).json({ success: true, data: member });
   } catch (err) {
+    console.error('Create team error:', err);
     res.status(500).json({ error: 'internal server error' });
   }
 });
 
-router.put('/team/:id', requirePermission('team.update'), async (req, res) => {
+router.put('/team/:id', requirePermission('team.update'), imgUpload.single('photo'), async (req, res) => {
   try {
     const TeamMember = makeTeamMemberModel(mongoose);
-    const member = await TeamMember.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!member) return res.status(404).json({ error: 'not found' });
+    const existing = await TeamMember.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'not found' });
+    const update = { ...req.body };
+    if (req.file) {
+      deleteImage(existing.photo);
+      update.photo = await saveImage(req.file.buffer, req.file.originalname);
+    }
+    const member = await TeamMember.findByIdAndUpdate(req.params.id, update, { new: true });
     res.json({ success: true, data: member });
   } catch (err) {
+    console.error('Update team error:', err);
     res.status(500).json({ error: 'internal server error' });
   }
 });
@@ -573,6 +595,7 @@ router.delete('/team/:id', requirePermission('team.delete'), async (req, res) =>
     const TeamMember = makeTeamMemberModel(mongoose);
     const member = await TeamMember.findByIdAndDelete(req.params.id);
     if (!member) return res.status(404).json({ error: 'not found' });
+    deleteImage(member.photo);
     res.json({ success: true, message: 'deleted' });
   } catch (err) {
     res.status(500).json({ error: 'internal server error' });
@@ -592,24 +615,34 @@ router.get('/authors', requirePermission('authors.view'), async (req, res) => {
   }
 });
 
-router.post('/authors', requirePermission('authors.create'), async (req, res) => {
+router.post('/authors', requirePermission('authors.create'), imgUpload.single('photo'), async (req, res) => {
   try {
     const Author = makeAuthorModel(mongoose);
-    const author = new Author(req.body);
+    const data = { ...req.body };
+    if (req.file) data.photo = await saveImage(req.file.buffer, req.file.originalname);
+    const author = new Author(data);
     await author.save();
     res.status(201).json({ success: true, data: author });
   } catch (err) {
+    console.error('Create author error:', err);
     res.status(500).json({ error: 'internal server error' });
   }
 });
 
-router.put('/authors/:id', requirePermission('authors.update'), async (req, res) => {
+router.put('/authors/:id', requirePermission('authors.update'), imgUpload.single('photo'), async (req, res) => {
   try {
     const Author = makeAuthorModel(mongoose);
-    const author = await Author.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!author) return res.status(404).json({ error: 'not found' });
+    const existing = await Author.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'not found' });
+    const update = { ...req.body };
+    if (req.file) {
+      deleteImage(existing.photo);
+      update.photo = await saveImage(req.file.buffer, req.file.originalname);
+    }
+    const author = await Author.findByIdAndUpdate(req.params.id, update, { new: true });
     res.json({ success: true, data: author });
   } catch (err) {
+    console.error('Update author error:', err);
     res.status(500).json({ error: 'internal server error' });
   }
 });
@@ -619,6 +652,7 @@ router.delete('/authors/:id', requirePermission('authors.delete'), async (req, r
     const Author = makeAuthorModel(mongoose);
     const author = await Author.findByIdAndDelete(req.params.id);
     if (!author) return res.status(404).json({ error: 'not found' });
+    deleteImage(author.photo);
     res.json({ success: true, message: 'deleted' });
   } catch (err) {
     res.status(500).json({ error: 'internal server error' });
