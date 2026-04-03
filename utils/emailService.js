@@ -1,9 +1,11 @@
 const nodemailer = require('nodemailer');
+const path = require('path');
 const mongoose = require('mongoose');
 const connect = require('../db');
 const EmailTemplate = require('../emailTemplate/schema');
 
-const LOGO_URL = 'https://res.cloudinary.com/db5eadfnx/image/upload/v1775209417/favicon-32x32_htywpe.png';
+const LOGO_PATH = path.join(__dirname, '..', 'asset', 'logo.jpeg');
+const LOGO_CID = 'sasanam-logo';
 const SITE_URL = 'https://sasanam.in';
 const BRAND_COLOR = '#8B4513';
 const BRAND_DARK = '#5a2d0c';
@@ -66,7 +68,7 @@ function interpolate(str, vars) {
   return str.replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] !== undefined ? vars[key] : `{{${key}}}`));
 }
 
-// ─── Base HTML Wrapper ────────────────────────────────────────
+// ─── Base HTML Wrapper (logo via CID) ─────────────────────────
 function wrapHtml(title, bodyContent) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -77,7 +79,7 @@ function wrapHtml(title, bodyContent) {
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(61,37,22,0.12);">
         <tr>
           <td style="background:linear-gradient(135deg,${BRAND_COLOR},${BRAND_DARK});padding:32px 40px;text-align:center;">
-            <img src="${LOGO_URL}" alt="Sasanam" width="56" height="56" style="border-radius:12px;margin-bottom:12px;background:rgba(255,255,255,0.15);padding:8px;" />
+            <img src="cid:${LOGO_CID}" alt="Sasanam" width="60" height="60" style="display:block;margin:0 auto 12px;border-radius:12px;" />
             <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:1px;">${title}</h1>
           </td>
         </tr>
@@ -101,23 +103,41 @@ function wrapHtml(title, bodyContent) {
 
 // ─── HTML building blocks ─────────────────────────────────────
 const h2 = (t) => `<h2 style="margin:0 0 16px;color:#3D2516;font-size:20px;font-weight:700;">${t}</h2>`;
-const p = (t) => `<p style="margin:0 0 16px;color:#4A3B32;font-size:15px;line-height:1.7;">${t}</p>`;
+const para = (t) => `<p style="margin:0 0 16px;color:#4A3B32;font-size:15px;line-height:1.7;">${t}</p>`;
 const row = (label, value) =>
   `<tr><td style="padding:10px 16px;color:#6A5A4A;font-size:13px;font-weight:600;border-bottom:1px solid #f0e8d8;">${label}</td><td style="padding:10px 16px;color:#3D2516;font-size:14px;font-weight:700;border-bottom:1px solid #f0e8d8;text-align:right;">${value}</td></tr>`;
-const table = (rows) =>
+const detailsTable = (rows) =>
   `<table width="100%" cellpadding="0" cellspacing="0" style="background:#faf8f4;border-radius:12px;overflow:hidden;margin:16px 0 24px;">${rows}</table>`;
 const btn = (text, href) =>
-  `<div style="text-align:center;margin:24px 0 8px;"><a href="${href}" style="display:inline-block;background:${BRAND_COLOR};color:#ffffff;padding:14px 36px;border-radius:50px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.5px;">${text}</a></div>`;
+  `<div style="text-align:center;margin:24px 0 8px;">
+    <a href="${href}" target="_blank" style="display:inline-block;background:${BRAND_COLOR};color:#ffffff;padding:14px 36px;border-radius:50px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.5px;">${text}</a>
+  </div>`;
 
-// ─── Send Helper (fire-and-forget) ────────────────────────────
+// ─── Send Helper (fire-and-forget, with embedded logo) ────────
 async function sendMail({ to, bcc, subject, html, from }) {
   const t = getTransporter();
   if (!t) return;
 
   const fromAddress = from || `Sasanam <${process.env.SMTP_USER}>`;
-  const opts = { from: fromAddress, subject, html };
-  if (bcc) { opts.to = process.env.SMTP_USER; opts.bcc = bcc; }
-  else { opts.to = to; }
+  const opts = {
+    from: fromAddress,
+    subject,
+    html,
+    attachments: [
+      {
+        filename: 'logo.jpeg',
+        path: LOGO_PATH,
+        cid: LOGO_CID,
+      },
+    ],
+  };
+
+  if (bcc) {
+    opts.to = process.env.SMTP_USER;
+    opts.bcc = bcc;
+  } else {
+    opts.to = to;
+  }
 
   try {
     await t.sendMail(opts);
@@ -145,9 +165,9 @@ function buildBodyFromTemplate(tpl, vars, extraRows) {
   const bodyParagraphs = interpolate(tpl.body, vars)
     .split('\n')
     .filter(Boolean)
-    .map((line) => p(line))
+    .map((line) => para(line))
     .join('');
-  const detailRows = extraRows ? table(extraRows) : '';
+  const detailRows = extraRows ? detailsTable(extraRows) : '';
   const buttonHtml = tpl.buttonText
     ? btn(interpolate(tpl.buttonText, vars), interpolate(tpl.buttonUrl, vars))
     : '';
@@ -172,8 +192,8 @@ async function sendWelcomeEmail({ email, name }) {
     subject = 'Welcome to Sasanam — Your Journey Begins';
     html = wrapHtml('Welcome to Sasanam',
       h2('Welcome to Sasanam!') +
-      p(`Dear <strong>${name}</strong>, welcome to Sasanam — India's digital archive of ancient inscriptions.`) +
-      p('Your account has been created successfully. Explore our collection and contribute to preserving history.') +
+      para(`Dear <strong>${name}</strong>, welcome to Sasanam — India's digital archive of ancient inscriptions.`) +
+      para('Your account has been created successfully. Explore our collection and contribute to preserving history.') +
       btn('Start Exploring', `${SITE_URL}/journal`)
     );
   }
@@ -198,8 +218,8 @@ async function sendSubscriptionEmail({ email, name, amount, orderId, endDate }) 
     subject = 'Subscription Confirmed — Welcome to Sasanam';
     html = wrapHtml('Subscription Confirmed',
       h2('Welcome, Contributor!') +
-      p(`Dear <strong>${name}</strong>, thank you for subscribing to Sasanam.`) +
-      table(details) +
+      para(`Dear <strong>${name}</strong>, thank you for subscribing to Sasanam.`) +
+      detailsTable(details) +
       btn('Explore the Archive', `${SITE_URL}/journal`)
     );
   }
@@ -224,8 +244,8 @@ async function sendDonationEmail({ email, name, amount, orderId, paymentId }) {
     subject = 'Thank You for Your Donation — Sasanam';
     html = wrapHtml('Thank You for Your Donation',
       h2('Your Generosity Matters') +
-      p(`Dear <strong>${name}</strong>, we are deeply grateful for your contribution.`) +
-      table(details) +
+      para(`Dear <strong>${name}</strong>, we are deeply grateful for your contribution.`) +
+      detailsTable(details) +
       btn('View Our Archive', `${SITE_URL}/journal`)
     );
   }
@@ -248,7 +268,7 @@ async function sendNewsNotification({ users, title, content, category }) {
   } else {
     subject = `${title} — Sasanam`;
     html = wrapHtml('New Update from Sasanam',
-      h2(title) + p(snippet) + btn('Read Full Update', `${SITE_URL}/news-events`)
+      h2(title) + para(snippet) + btn('Read Full Update', `${SITE_URL}/news-events`)
     );
   }
 
@@ -275,8 +295,8 @@ async function sendNewBookNotification({ users, bookName, authorName, bookType }
     subject = `${typeLabel}: ${bookName} — Sasanam`;
     html = wrapHtml(`${typeLabel} Added`,
       h2(`${typeLabel}: ${bookName}`) +
-      p(`A new ${bookTypeName} has been added to our archive.`) +
-      table(details) +
+      para(`A new ${bookTypeName} has been added to our archive.`) +
+      detailsTable(details) +
       btn(`View ${typeLabel}`, link)
     );
   }
