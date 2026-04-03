@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const connect = require('../db');
 const mongoose = require('mongoose');
 const makeUserModel = require('./schema');
+const { sendWelcomeEmail } = require('../utils/emailService');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -60,6 +61,9 @@ const signup = async (fullName, password, email) => {
       email:normalizedEmail
     });
     await user.save();
+
+    // Send welcome email (fire-and-forget)
+    sendWelcomeEmail({ email: normalizedEmail, name: normalizedFullname });
 
     return {
       success: true,

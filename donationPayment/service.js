@@ -7,6 +7,7 @@ const makeDonationListModel = require('../donationList/schema');
 const makeUserModel = require('../auth/schema');
 
 const AppError = require('../utils/AppError');
+const { sendDonationEmail } = require('../utils/emailService');
 
 const getRazorpayClient = () => {
   const keyId = process.env.RAZORPAY_KEY_ID;
@@ -178,6 +179,17 @@ const verifyPayment = async (payload, userId) => {
         orderId: paymentRecord.orderId,
         paymentId: paymentRecord.paymentId,
         donationDate: paymentRecord.verifiedAt
+      });
+    }
+
+    // Send donation thank-you email (fire-and-forget)
+    if (user && user.email) {
+      sendDonationEmail({
+        email: user.email,
+        name: donaterName,
+        amount: paymentRecord.amount,
+        orderId: paymentRecord.orderId,
+        paymentId: paymentRecord.paymentId,
       });
     }
 

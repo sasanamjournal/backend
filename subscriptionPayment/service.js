@@ -6,6 +6,7 @@ const makeRazorpayPaymentModel = require('./schema');
 const makeUserModel = require('../auth/schema');
 
 const AppError = require('../utils/AppError');
+const { sendSubscriptionEmail } = require('../utils/emailService');
 
 const getRazorpayClient = () => {
   const keyId = process.env.RAZORPAY_KEY_ID;
@@ -168,6 +169,15 @@ const verifyPayment = async (payload, userId) => {
       isSubscribed: true,
       subscriptionEndDate: endDate,
     }, { new: true }).exec();
+
+    // Send confirmation email (fire-and-forget)
+    sendSubscriptionEmail({
+      email: updatedUser.email,
+      name: updatedUser.fullName,
+      amount: paymentRecord.amount,
+      orderId: paymentRecord.orderId,
+      endDate,
+    });
 
     return {
       data: {

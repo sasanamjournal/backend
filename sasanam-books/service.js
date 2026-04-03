@@ -3,6 +3,8 @@ const connect = require('../db');
 const mongoose = require('mongoose');
 const Books = require('./schema');
 const AppError = require('../utils/AppError');
+const makeUserModel = require('../auth/schema');
+const { sendNewBookNotification } = require('../utils/emailService');
 
 async function createBook(data) {
   try {
@@ -37,6 +39,18 @@ async function createBook(data) {
       sectionId: data.sectionId
     });
     const saved = await book.save();
+
+    // Notify all users via email (fire-and-forget)
+    const User = makeUserModel(mongoose);
+    User.find({}, 'email').lean().exec().then(users => {
+      sendNewBookNotification({
+        users,
+        bookName: saved.bookName,
+        authorName: saved.authorName,
+        bookType: saved.bookType || 'journal',
+      });
+    }).catch(err => console.error('Failed to fetch users for book email:', err.message));
+
     return {
       data: saved.toObject(),
       status: 201,

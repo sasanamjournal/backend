@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const connect = require('../db');
 const makeUserNewsModel = require('./schema');
+const makeUserModel = require('../auth/schema');
 const AppError = require('../utils/AppError');
+const { sendNewsNotification } = require('../utils/emailService');
 
 async function getAllNews(limit = 20, page = 1) {
   try {
@@ -51,6 +53,13 @@ async function createNews({ title, content, category, imageUrl, author }) {
     const UserNews = makeUserNewsModel(mongoose);
     const item = new UserNews({ title, content, category, imageUrl, author });
     await item.save();
+
+    // Notify all users via email (fire-and-forget)
+    const User = makeUserModel(mongoose);
+    User.find({}, 'email').lean().exec().then(users => {
+      sendNewsNotification({ users, title, content, category });
+    }).catch(err => console.error('Failed to fetch users for news email:', err.message));
+
     return { data: item.toObject(), status: 201, error: null };
   } catch (err) {
     console.error('createNews error:', err);

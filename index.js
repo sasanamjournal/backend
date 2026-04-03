@@ -19,6 +19,7 @@ const sasanamBookDetailsRouter = require('./sasanam-book-details/routes');
 const userNewsRouter = require('./userNews/routes');
 const aboutRouter = require('./about/routes');
 const adminRouter = require('./admin/routes');
+const emailTemplateRouter = require('./emailTemplate/routes');
 const connect = require('./db');
 
 const app = express();
@@ -198,6 +199,7 @@ app.use('/sasanam-books', authenticateToken, booksRouter);
 app.use('/user-news', authenticateToken, userNewsRouter);
 app.use('/sasanam-book-details', authenticateToken, sasanamBookDetailsRouter);
 app.use('/admin', adminRouter);
+app.use('/email-templates', authenticateToken, emailTemplateRouter);
 
 // Image serve route (public, with resize support: ?w=360|640|1080)
 const { serveImage } = require('./utils/imageUpload');
