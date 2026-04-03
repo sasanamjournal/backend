@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const connect = require('../db');
 const EmailTemplate = require('../emailTemplate/schema');
 
-const LOGO_URL = 'https://sasanam.in/logo.webp';
+const LOGO_URL = 'https://res.cloudinary.com/db5eadfnx/image/upload/v1775209417/favicon-32x32_htywpe.png';
 const SITE_URL = 'https://sasanam.in';
 const BRAND_COLOR = '#8B4513';
 const BRAND_DARK = '#5a2d0c';
