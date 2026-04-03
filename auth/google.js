@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const makeUserModel = require('./schema');
 const connect = require('../db');
 const crypto = require('crypto');
+const { sendWelcomeEmail } = require('../utils/emailService');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_EXPIRES_IN = process.env.TOKEN_EXPIRES_IN || '10d';
@@ -57,6 +58,9 @@ function setupGoogleAuth() {
           isSubscribed: false,
         });
         await user.save();
+
+        // Send welcome email (fire-and-forget)
+        sendWelcomeEmail({ email, name: fullName });
       }
 
       return done(null, user);
