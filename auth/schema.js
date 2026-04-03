@@ -36,6 +36,10 @@ const userSchema = new Schema({
     type: Boolean,
     default: false
   },
+  googleId: {
+    type: String,
+    default: null,
+  },
   downloadCount: {
     type: Number,
     default: 0

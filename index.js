@@ -34,6 +34,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
+// Passport (Google OAuth)
+const passport = require('passport');
+app.use(passport.initialize());
+
 // Rate limiting - 100 requests per 15 minutes per IP
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,

@@ -1,7 +1,16 @@
 const express = require('express');
 const controller = require('./controller');
+const { setupGoogleAuth, addGoogleRoutes } = require('./google');
+const { addResetRoutes } = require('./resetPassword');
 
 const router = express.Router();
+
+// Google OAuth
+setupGoogleAuth();
+addGoogleRoutes(router);
+
+// Forgot/Reset password
+addResetRoutes(router);
 
 /**
  * @swagger
