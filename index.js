@@ -20,6 +20,7 @@ const userNewsRouter = require('./userNews/routes');
 const aboutRouter = require('./about/routes');
 const adminRouter = require('./admin/routes');
 const emailTemplateRouter = require('./emailTemplate/routes');
+const blogRouter = require('./blog/routes');
 const connect = require('./db');
 
 const app = express();
@@ -189,6 +190,7 @@ const contactRouter = require('./contact/routes');
 
 app.use('/auth', authRouter);
 app.use('/contact', contactRouter);
+app.use('/blog', blogRouter);
 app.use('/donation-list', donationListRouter);
 app.use('/about', aboutRouter);
 app.use('/subscription-payment', authenticateToken, subscriptionPaymentRouter);
