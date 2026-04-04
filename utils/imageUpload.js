@@ -5,11 +5,20 @@ const { uploadImage, deleteFromR2, getStreamFromR2, getPublicUrl } = require('./
 // Multer memory storage — process with sharp then upload to R2
 const storage = multer.memoryStorage();
 
-const fileFilter = (_req, file, cb) => {
-  if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+
+// Custom fileFilter: allow images for coverImage, PDFs for pdfFile
+const fileFilter = (req, file, cb) => {
+  // Accept images for coverImage
+  if (file.fieldname === 'coverImage' && ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
     cb(null, true);
-  } else {
-    cb(new Error('Only JPEG, PNG, or WebP images are allowed'), false);
+  }
+  // Accept PDFs for pdfFile
+  else if (file.fieldname === 'pdfFile' && file.mimetype === 'application/pdf') {
+    cb(null, true);
+  }
+  // Otherwise, reject
+  else {
+    cb(new Error('Only JPEG, PNG, WebP images (for coverImage) or PDF (for pdfFile) are allowed'), false);
   }
 };
 

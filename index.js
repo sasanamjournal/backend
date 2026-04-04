@@ -22,7 +22,7 @@ const adminRouter = require('./admin/routes');
 const emailTemplateRouter = require('./emailTemplate/routes');
 const blogRouter = require('./blog/routes');
 const connect = require('./db');
-
+const bulkbookRouter = require('./sasanam-bulkbooks/routes');
 const app = express();
 
 // Security & performance middleware
@@ -207,7 +207,7 @@ app.use('/subscription-payment', authenticateToken, subscriptionPaymentRouter);
 app.use('/donation-payment', authenticateToken, donationPaymentRouter);
 app.use('/sasanam-section', authenticateToken, sectionRouter);
 app.use('/sasanam-books', authenticateToken, booksRouter);
-
+app.use('/sasanam-bulkbooks', authenticateToken, bulkbookRouter);
 app.use('/user-news', authenticateToken, userNewsRouter);
 app.use('/sasanam-book-details', authenticateToken, sasanamBookDetailsRouter);
 app.use('/admin', adminRouter);

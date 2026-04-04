@@ -1,7 +1,9 @@
+// Mount sasanma-bulkbooks under /admin/sasanma-bulkbooks
 const express = require('express');
 const mongoose = require('mongoose');
 const { requireAdmin, requirePermission, flattenPermissions, getRolesFromDB, invalidateRoleCache } = require('../auth/adminMiddleware');
 const makeUserModel = require('../auth/schema');
+const bulkbooksRouter = require('../sasanam-bulkbooks/routes');
 const makeRoleModel = require('../auth/roleSchema');
 const makeSubscriptionPaymentModel = require('../subscriptionPayment/schema');
 const makeDonationPaymentModel = require('../donationPayment/schema');
@@ -20,10 +22,10 @@ const ContactMessage = require('../contact/schema');
 const nodemailer = require('nodemailer');
 
 const router = express.Router();
-
 // All admin routes require admin panel access (mentor, admin, super_admin)
 router.use(requireAdmin);
 
+router.use("/sasanam-bulkbooks", bulkbooksRouter);
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
