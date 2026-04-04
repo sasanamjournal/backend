@@ -1060,11 +1060,21 @@ router.get('/archive-items', requirePermission('news.view'), async (req, res) =>
   }
 });
 
-router.post('/archive-items', requirePermission('news.create'), imgUpload.single('image'), async (req, res) => {
+router.post('/archive-items', requirePermission('news.create'), imgUpload.array('images', 10), async (req, res) => {
   try {
     const ArchiveItem = makeArchiveItemModel(mongoose);
     const data = { ...req.body };
-    if (req.file) data.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+    // Handle multiple image uploads
+    const uploaded = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        uploaded.push(await saveImage(file.buffer, file.originalname));
+      }
+    }
+    // Merge with any existing image URLs sent from frontend (for external URLs)
+    const existing = data.existingImages ? (Array.isArray(data.existingImages) ? data.existingImages : [data.existingImages]) : [];
+    data.images = [...existing, ...uploaded];
+    delete data.existingImages;
     const item = new ArchiveItem(data);
     await item.save();
     res.status(201).json({ success: true, data: item });
@@ -1074,21 +1084,35 @@ router.post('/archive-items', requirePermission('news.create'), imgUpload.single
   }
 });
 
-router.put('/archive-items/:id', requirePermission('news.update'), imgUpload.single('image'), async (req, res) => {
+router.put('/archive-items/:id', requirePermission('news.update'), imgUpload.array('images', 10), async (req, res) => {
   try {
     const ArchiveItem = makeArchiveItemModel(mongoose);
     const existing = await ArchiveItem.findById(req.params.id);
     if (!existing) return res.status(404).json({ error: 'not found' });
     const update = { ...req.body };
-    if (req.body.removeImage === 'true') {
-      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
-      update.imageUrl = '';
+
+    // Parse kept images from frontend (images the user didn't remove)
+    const kept = update.existingImages ? (Array.isArray(update.existingImages) ? update.existingImages : [update.existingImages]) : [];
+    delete update.existingImages;
+
+    // Delete removed images from storage
+    const oldImages = existing.images || [];
+    for (const img of oldImages) {
+      if (!kept.includes(img) && img && !img.startsWith('http')) {
+        deleteImage(img);
+      }
     }
-    if (req.file) {
-      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
-      update.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+
+    // Upload new images
+    const uploaded = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        uploaded.push(await saveImage(file.buffer, file.originalname));
+      }
     }
-    delete update.removeImage;
+
+    update.images = [...kept, ...uploaded];
+
     const item = await ArchiveItem.findByIdAndUpdate(req.params.id, update, { new: true });
     res.json({ success: true, data: item });
   } catch (err) {
@@ -1102,7 +1126,10 @@ router.delete('/archive-items/:id', requirePermission('news.delete'), async (req
     const ArchiveItem = makeArchiveItemModel(mongoose);
     const item = await ArchiveItem.findByIdAndDelete(req.params.id);
     if (!item) return res.status(404).json({ error: 'not found' });
-    if (item.imageUrl && !item.imageUrl.startsWith('http')) deleteImage(item.imageUrl);
+    // Delete all images
+    for (const img of (item.images || [])) {
+      if (img && !img.startsWith('http')) deleteImage(img);
+    }
     res.json({ success: true, message: 'deleted' });
   } catch (err) {
     res.status(500).json({ error: 'internal server error' });

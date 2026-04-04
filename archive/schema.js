@@ -4,7 +4,7 @@ const archiveItemSchema = new Schema({
   title:       { type: String, required: true, trim: true, maxlength: 200 },
   period:      { type: String, trim: true, maxlength: 100, default: '' },
   content:     { type: String, required: true, trim: true },
-  imageUrl:    { type: String, trim: true, default: null },
+  images:      [{ type: String, trim: true }],
   isPublished: { type: Boolean, default: true },
   order:       { type: Number, default: 0 },
 }, { timestamps: true });
