@@ -979,4 +979,199 @@ router.get('/payments/:type/:id', requirePermission('payments.view'), async (req
   }
 });
 
+// ═══════════════════════════════════════════
+// LIBRARY LINKS MANAGEMENT
+// ═══════════════════════════════════════════
+const makeLibraryLinkModel = require('../library/schema');
+
+router.get('/library-links', requirePermission('news.view'), async (req, res) => {
+  try {
+    const LibraryLink = makeLibraryLinkModel(mongoose);
+    const links = await LibraryLink.find().sort({ order: 1, createdAt: -1 }).lean();
+    res.json({ success: true, data: links });
+  } catch (err) {
+    console.error('Get library links error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.post('/library-links', requirePermission('news.create'), imgUpload.single('image'), async (req, res) => {
+  try {
+    const LibraryLink = makeLibraryLinkModel(mongoose);
+    const data = { ...req.body };
+    if (req.file) data.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+    const link = new LibraryLink(data);
+    await link.save();
+    res.status(201).json({ success: true, data: link });
+  } catch (err) {
+    console.error('Create library link error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.put('/library-links/:id', requirePermission('news.update'), imgUpload.single('image'), async (req, res) => {
+  try {
+    const LibraryLink = makeLibraryLinkModel(mongoose);
+    const existing = await LibraryLink.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'not found' });
+    const update = { ...req.body };
+    if (req.body.removeImage === 'true') {
+      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
+      update.imageUrl = '';
+    }
+    if (req.file) {
+      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
+      update.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+    }
+    delete update.removeImage;
+    const link = await LibraryLink.findByIdAndUpdate(req.params.id, update, { new: true });
+    res.json({ success: true, data: link });
+  } catch (err) {
+    console.error('Update library link error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.delete('/library-links/:id', requirePermission('news.delete'), async (req, res) => {
+  try {
+    const LibraryLink = makeLibraryLinkModel(mongoose);
+    const link = await LibraryLink.findByIdAndDelete(req.params.id);
+    if (!link) return res.status(404).json({ error: 'not found' });
+    if (link.imageUrl && !link.imageUrl.startsWith('http')) deleteImage(link.imageUrl);
+    res.json({ success: true, message: 'deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// ARCHIVE ITEMS MANAGEMENT
+// ═══════════════════════════════════════════
+const makeArchiveItemModel = require('../archive/schema');
+
+router.get('/archive-items', requirePermission('news.view'), async (req, res) => {
+  try {
+    const ArchiveItem = makeArchiveItemModel(mongoose);
+    const items = await ArchiveItem.find().sort({ order: 1, createdAt: -1 }).lean();
+    res.json({ success: true, data: items });
+  } catch (err) {
+    console.error('Get archive items error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.post('/archive-items', requirePermission('news.create'), imgUpload.single('image'), async (req, res) => {
+  try {
+    const ArchiveItem = makeArchiveItemModel(mongoose);
+    const data = { ...req.body };
+    if (req.file) data.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+    const item = new ArchiveItem(data);
+    await item.save();
+    res.status(201).json({ success: true, data: item });
+  } catch (err) {
+    console.error('Create archive item error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.put('/archive-items/:id', requirePermission('news.update'), imgUpload.single('image'), async (req, res) => {
+  try {
+    const ArchiveItem = makeArchiveItemModel(mongoose);
+    const existing = await ArchiveItem.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'not found' });
+    const update = { ...req.body };
+    if (req.body.removeImage === 'true') {
+      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
+      update.imageUrl = '';
+    }
+    if (req.file) {
+      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
+      update.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+    }
+    delete update.removeImage;
+    const item = await ArchiveItem.findByIdAndUpdate(req.params.id, update, { new: true });
+    res.json({ success: true, data: item });
+  } catch (err) {
+    console.error('Update archive item error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.delete('/archive-items/:id', requirePermission('news.delete'), async (req, res) => {
+  try {
+    const ArchiveItem = makeArchiveItemModel(mongoose);
+    const item = await ArchiveItem.findByIdAndDelete(req.params.id);
+    if (!item) return res.status(404).json({ error: 'not found' });
+    if (item.imageUrl && !item.imageUrl.startsWith('http')) deleteImage(item.imageUrl);
+    res.json({ success: true, message: 'deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// RESOURCE CENTERS MANAGEMENT (Community)
+// ═══════════════════════════════════════════
+const makeResourceCenterModel = require('../community/schema');
+
+router.get('/resource-centers', requirePermission('news.view'), async (req, res) => {
+  try {
+    const ResourceCenter = makeResourceCenterModel(mongoose);
+    const centers = await ResourceCenter.find().sort({ order: 1, createdAt: -1 }).lean();
+    res.json({ success: true, data: centers });
+  } catch (err) {
+    console.error('Get resource centers error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.post('/resource-centers', requirePermission('news.create'), imgUpload.single('image'), async (req, res) => {
+  try {
+    const ResourceCenter = makeResourceCenterModel(mongoose);
+    const data = { ...req.body };
+    if (req.file) data.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+    const center = new ResourceCenter(data);
+    await center.save();
+    res.status(201).json({ success: true, data: center });
+  } catch (err) {
+    console.error('Create resource center error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.put('/resource-centers/:id', requirePermission('news.update'), imgUpload.single('image'), async (req, res) => {
+  try {
+    const ResourceCenter = makeResourceCenterModel(mongoose);
+    const existing = await ResourceCenter.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'not found' });
+    const update = { ...req.body };
+    if (req.body.removeImage === 'true') {
+      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
+      update.imageUrl = '';
+    }
+    if (req.file) {
+      if (existing.imageUrl && !existing.imageUrl.startsWith('http')) deleteImage(existing.imageUrl);
+      update.imageUrl = await saveImage(req.file.buffer, req.file.originalname);
+    }
+    delete update.removeImage;
+    const center = await ResourceCenter.findByIdAndUpdate(req.params.id, update, { new: true });
+    res.json({ success: true, data: center });
+  } catch (err) {
+    console.error('Update resource center error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.delete('/resource-centers/:id', requirePermission('news.delete'), async (req, res) => {
+  try {
+    const ResourceCenter = makeResourceCenterModel(mongoose);
+    const center = await ResourceCenter.findByIdAndDelete(req.params.id);
+    if (!center) return res.status(404).json({ error: 'not found' });
+    if (center.imageUrl && !center.imageUrl.startsWith('http')) deleteImage(center.imageUrl);
+    res.json({ success: true, message: 'deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
 module.exports = router;

@@ -187,12 +187,20 @@ app.get('/health', (req, res) => {
 });
 
 const contactRouter = require('./contact/routes');
+const libraryRouter = require('./library/routes');
+const archiveRouter = require('./archive/routes');
+const communityRouter = require('./community/routes');
+const publicNewsRouter = require('./userNews/publicRoutes');
 
 app.use('/auth', authRouter);
 app.use('/contact', contactRouter);
 app.use('/blog', blogRouter);
 app.use('/donation-list', donationListRouter);
 app.use('/about', aboutRouter);
+app.use('/library', libraryRouter);
+app.use('/archive', archiveRouter);
+app.use('/community', communityRouter);
+app.use('/news', publicNewsRouter);
 app.use('/subscription-payment', authenticateToken, subscriptionPaymentRouter);
 app.use('/donation-payment', authenticateToken, donationPaymentRouter);
 app.use('/sasanam-section', authenticateToken, sectionRouter);
