@@ -1095,13 +1095,15 @@ router.put('/archive-items/:id', requirePermission('news.update'), imgUpload.arr
     const kept = update.existingImages ? (Array.isArray(update.existingImages) ? update.existingImages : [update.existingImages]) : [];
     delete update.existingImages;
 
-    // Delete removed images from storage
-    const oldImages = existing.images || [];
+    // Delete removed images from storage (handle old imageUrl field too)
+    const oldImages = (existing.images && existing.images.length > 0) ? existing.images : (existing.imageUrl ? [existing.imageUrl] : []);
     for (const img of oldImages) {
       if (!kept.includes(img) && img && !img.startsWith('http')) {
         deleteImage(img);
       }
     }
+    // Clean up old imageUrl field during migration
+    if (existing.imageUrl !== undefined) update.imageUrl = undefined;
 
     // Upload new images
     const uploaded = [];
@@ -1126,8 +1128,9 @@ router.delete('/archive-items/:id', requirePermission('news.delete'), async (req
     const ArchiveItem = makeArchiveItemModel(mongoose);
     const item = await ArchiveItem.findByIdAndDelete(req.params.id);
     if (!item) return res.status(404).json({ error: 'not found' });
-    // Delete all images
-    for (const img of (item.images || [])) {
+    // Delete all images (handle old imageUrl field too)
+    const allImgs = (item.images && item.images.length > 0) ? item.images : (item.imageUrl ? [item.imageUrl] : []);
+    for (const img of allImgs) {
       if (img && !img.startsWith('http')) deleteImage(img);
     }
     res.json({ success: true, message: 'deleted' });
