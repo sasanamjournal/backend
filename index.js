@@ -191,6 +191,7 @@ const libraryRouter = require('./library/routes');
 const archiveRouter = require('./archive/routes');
 const communityRouter = require('./community/routes');
 const publicNewsRouter = require('./userNews/publicRoutes');
+const siteSettingsRouter = require('./siteSettings/routes');
 
 app.use('/auth', authRouter);
 app.use('/contact', contactRouter);
@@ -201,6 +202,7 @@ app.use('/library', libraryRouter);
 app.use('/archive', archiveRouter);
 app.use('/community', communityRouter);
 app.use('/news', publicNewsRouter);
+app.use('/site-settings', siteSettingsRouter);
 app.use('/subscription-payment', authenticateToken, subscriptionPaymentRouter);
 app.use('/donation-payment', authenticateToken, donationPaymentRouter);
 app.use('/sasanam-section', authenticateToken, sectionRouter);

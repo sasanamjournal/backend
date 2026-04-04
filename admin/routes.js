@@ -1204,4 +1204,45 @@ router.delete('/resource-centers/:id', requirePermission('news.delete'), async (
   }
 });
 
+// ═══════════════════════════════════════════
+// SITE SETTINGS (Launch Control)
+// ═══════════════════════════════════════════
+const makeSiteSettingsModel = require('../siteSettings/schema');
+
+router.get('/site-settings', requirePermission('dashboard.view'), async (req, res) => {
+  try {
+    const SiteSettings = makeSiteSettingsModel(mongoose);
+    let settings = await SiteSettings.findOne({ key: 'main' }).lean();
+    if (!settings) {
+      const doc = new SiteSettings({ key: 'main', isLive: false, launchDate: null });
+      await doc.save();
+      settings = doc.toObject();
+    }
+    res.json({ success: true, data: settings });
+  } catch (err) {
+    console.error('Get site settings error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+router.put('/site-settings', requirePermission('dashboard.view'), async (req, res) => {
+  try {
+    const SiteSettings = makeSiteSettingsModel(mongoose);
+    const { isLive, launchDate } = req.body;
+    const update = {};
+    if (isLive !== undefined) update.isLive = isLive;
+    if (launchDate !== undefined) update.launchDate = launchDate;
+
+    const settings = await SiteSettings.findOneAndUpdate(
+      { key: 'main' },
+      update,
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    res.json({ success: true, data: settings });
+  } catch (err) {
+    console.error('Update site settings error:', err);
+    res.status(500).json({ error: 'internal server error' });
+  }
+});
+
 module.exports = router;
