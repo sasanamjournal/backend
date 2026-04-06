@@ -84,7 +84,7 @@ const createOrder = async (payload, userId) => {
       userId,
       orderId: order.id,
       receipt: order.receipt,
-      amount: order.amount,
+      amount: order.amount / 100,
       currency: order.currency,
       status: order.status || 'created',
       donorMessage,

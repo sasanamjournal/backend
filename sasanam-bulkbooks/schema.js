@@ -4,7 +4,11 @@ const { Schema } = mongoose;
 const SasanmaBulkBookSchema = new Schema({
   bookName: { type: String, required: true },
   authorName: { type: String, required: true },
-  sectionId: { type: Schema.Types.ObjectId, ref: 'SasanamSection', required: true },
+  sectionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Section',
+      required: true
+    },
   pdfFile: { type: String, required: true },
   coverImage: { type: String, default: '' },
   description: { type: String, default: '' },

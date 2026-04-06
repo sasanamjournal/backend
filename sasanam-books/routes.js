@@ -148,6 +148,7 @@ router.delete('/:id', controller.deleteBook);
 // ═══════════════════════════════════════════
 router.get('/:id/view', async (req, res) => {
   try {
+    console.log("req",req);
     const Books = require('./schema');
     const book = await Books.findById(req.params.id).exec();
     if (!book) return res.status(404).json({ error: 'book not found' });

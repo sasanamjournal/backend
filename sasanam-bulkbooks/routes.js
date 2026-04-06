@@ -102,7 +102,11 @@ router.get('/:id', controller.getBulkBookById);
  *       404:
  *         description: Not found
  */
-router.put('/:id', controller.updateBulkBook);
+router.put('/:id',
+  upload.fields([
+    { name: 'pdfFile', maxCount: 1 },
+    { name: 'coverImage', maxCount: 1 },
+  ]), controller.updateBulkBook);
 
 /**
  * @swagger
@@ -152,5 +156,61 @@ router.delete('/:id', controller.deleteBulkBook);
  *         description:
  *           type: string
  */
+
+
+/**
+ * @swagger
+ * /sasanma-bulkbooks/view/pdf/{id}:
+ *   get:
+ *     summary: View PDF of a bulk book by ID
+ *     tags: [SasanmaBulkBooks]
+ *     security: [bearerAuth]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The bulk book ID
+ *     responses:
+ *       200:
+ *         description: PDF file stream
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Not found
+ */
+router.get('/view/pdf/:id', controller.viewBulkBookPdf);
+
+
+/**
+ * @swagger
+ * /sasanma-bulkbooks/download/pdf/{id}:
+ *   get:
+ *     summary: Download PDF of a bulk book by ID
+ *     tags: [SasanmaBulkBooks]
+ *     security: [bearerAuth]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The bulk book ID
+ *     responses:
+ *       200:
+ *         description: PDF file download
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Not found
+ */
+router.get('/download/pdf/:id', controller.downloadBulkBookPdf);
 
 module.exports = router;
