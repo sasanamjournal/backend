@@ -63,12 +63,22 @@ const signup = async (fullName, password, email) => {
     await user.save();
 
     // Send welcome email (fire-and-forget)
+     const savedUser = await User.findOne({ email: normalizedEmail }).exec();
+  
+if (!savedUser) return { error: 'invalid credentials', status: 401 };
+  const valid = await savedUser.comparePassword(password);
+  if (!valid) return { error: 'invalid credentials', status: 401 };
+  const payload = { sub: savedUser._id.toString(), username: savedUser.email, role: savedUser.role || 'user' };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
+
     sendWelcomeEmail({ email: normalizedEmail, name: normalizedFullname });
 
     return {
-      success: true,
-      status: 201,
-    };
+    token,
+    expiresIn: TOKEN_EXPIRES_IN,
+    user: savedUser.toJSON(),
+    status: 200
+  };
   } catch (err) {
     if (err && err.code === 11000) {
       return { error: 'user already exists', status: 409 };

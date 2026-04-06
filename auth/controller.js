@@ -31,7 +31,7 @@ try {
   }
   
   // Add: Send success response
-  return res.status(result.status || 201).json({ message: 'Signup successful' });
+  return res.status(result.status || 201).json({result });
 } catch (err) {
   console.error('Auth signup error:', err);
   return res.status(500).json({ error: 'internal server error' });

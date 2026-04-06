@@ -82,7 +82,7 @@ const getBulkBookById = async (req, res, next) => {
 
 const updateBulkBook = async (req, res, next) => {
   try {
-    validateBulkBook(req.body);
+    console.log('Update bulk book request body:', req.body);
     const book = await service.updateBulkBook(req.params.id, req.body);
     res.json(book);
   } catch (err) {
@@ -93,11 +93,31 @@ const updateBulkBook = async (req, res, next) => {
 const deleteBulkBook = async (req, res, next) => {
   try {
     await service.deleteBulkBook(req.params.id);
-    res.json({ message: 'Deleted' });
+    res.json({ success: true, message: 'deleted' });
   } catch (err) {
     next(err);
   }
 };
+
+
+const viewBulkBookPdf = async (req, res, next) => {
+  try {
+    console.log('View bulk book PDF request for ID:', req.params.id);
+    const range = req.headers.range || null;
+    await service.viewBulkBookPdf(req.params.id, res, range);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const downloadBulkBookPdf = async (req, res, next) => {
+  try {
+    await service.downloadBulkBookPdf(req, res);
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 module.exports = {
   createBulkBook,
@@ -105,4 +125,6 @@ module.exports = {
   getBulkBookById,
   updateBulkBook,
   deleteBulkBook,
+  viewBulkBookPdf,
+  downloadBulkBookPdf,
 };
