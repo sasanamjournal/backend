@@ -9,7 +9,8 @@ const SasanmaBulkBookSchema = new Schema({
       ref: 'Section',
       required: true
     },
-  pdfFile: { type: String, required: true },
+  pdfFile: { type: String, default: '',
+    trim: true },
   coverImage: { type: String, default: '' },
   description: { type: String, default: '' },
   order: { type: Number, required: true },
