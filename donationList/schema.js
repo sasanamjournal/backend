@@ -2,7 +2,7 @@ const { Schema } = require('mongoose');
 
 const donationListSchema = new Schema({
   donaterName: {
-    type: String,
+    type:String,
     required: true,
     trim: true,
     maxlength: 100

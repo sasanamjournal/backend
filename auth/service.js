@@ -46,13 +46,6 @@ const signup = async (fullName, password, email) => {
     return { error: 'email already exists', status: 409 };
   }
 
-  if (normalizedFullname) {
-    const existingEmail = await User.findOne({ fullName: normalizedFullname }).exec();
-    if (existingEmail) {
-      return { error: 'fullName already exists', status: 409 };
-    }
-  }
-
   try {
     const user = new User({
       fullName: normalizedFullname,
@@ -81,6 +74,7 @@ if (!savedUser) return { error: 'invalid credentials', status: 401 };
   };
   } catch (err) {
     if (err && err.code === 11000) {
+      console.log('Duplicate email error:', err);
       return { error: 'user already exists', status: 409 };
     }
     throw err;

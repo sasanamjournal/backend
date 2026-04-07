@@ -4,8 +4,8 @@ const donationPaymentSchema = new Schema({
   userId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    index: true,
+    default: null
   },
   orderId: {
     type: String,

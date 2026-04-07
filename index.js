@@ -204,7 +204,7 @@ app.use('/community', communityRouter);
 app.use('/news', publicNewsRouter);
 app.use('/site-settings', siteSettingsRouter);
 app.use('/subscription-payment', authenticateToken, subscriptionPaymentRouter);
-app.use('/donation-payment', authenticateToken, donationPaymentRouter);
+app.use('/donation-payment', donationPaymentRouter);
 app.use('/sasanam-section', authenticateToken, sectionRouter);
 app.use('/sasanam-books', authenticateToken, booksRouter);
 app.use('/sasanam-bulkbooks', authenticateToken, bulkbookRouter);

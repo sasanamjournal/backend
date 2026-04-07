@@ -3,7 +3,7 @@
 const mongoose = require('mongoose');
 const SasanmaBulkBook = require('./schema');
 const AppError = require('../utils/AppError');
-const { getStreamFromR2 } = require('../utils/r2');
+const { getStreamFromR2,deleteFromR2 } = require('../utils/r2');
 const makeUserModel = require('../auth/schema');
 const makeRoleModel = require('../auth/roleSchema');
 const createBulkBook = async (data) => {

@@ -2,7 +2,7 @@ const donationPaymentService = require('./service');
 
 const createOrder = async (req, res) => {
   try {
-    const result = await donationPaymentService.createOrder(req.body, req.user && req.user.sub);
+    const result = await donationPaymentService.createOrder(req.body);
     console.log('DonationPayment create order controller result:', req.body, req.user && req.user.sub, result);
 
     if (result.error) {
@@ -30,7 +30,7 @@ const createOrder = async (req, res) => {
 
 const verifyPayment = async (req, res) => {
   try {
-    const result = await donationPaymentService.verifyPayment(req.body, req.user && req.user.sub);
+    const result = await donationPaymentService.verifyPayment(req.body);
 
     if (result.error) {
       return res.status(result.status || 400).json({
