@@ -31,6 +31,11 @@ const donationListSchema = new Schema({
     required: true,
     default: Date.now,
     index: true
+  },
+  mobileNumber: {
+    type: String,
+    default: null,
+    trim: true
   }
 }, { timestamps: true });
 

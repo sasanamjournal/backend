@@ -168,7 +168,7 @@ const verifyPayment = async (payload) => {
     userDetails = user;
     }
 
-    const donaterName = userDetails && userDetails.fullName ? userDetails.fullName : 'anonymous';
+    const donaterName = userDetails && userDetails.fullName ? userDetails.fullName : payload?.donaterName ? String(payload.donaterName) : 'Anonymous';
 
     const existingDonation = await DonationList.findOne({
       orderId: paymentRecord.orderId
@@ -179,7 +179,8 @@ const verifyPayment = async (payload) => {
         donationAmount: paymentRecord.amount,
         orderId: paymentRecord.orderId,
         paymentId: paymentRecord.paymentId,
-        donationDate: paymentRecord.verifiedAt
+        donationDate: paymentRecord.verifiedAt,
+        mobileNumber: payload?.mobileNumber ? String(payload.mobileNumber).trim() : null
       });
     }
     const email = userDetails ? userDetails && userDetails.email ? userDetails.email : null : donaterName && donaterName.includes('@') ? donaterName : null;
