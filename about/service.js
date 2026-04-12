@@ -3,13 +3,57 @@ const connect = require('../db');
 const { makeTeamMemberModel, makeAuthorModel } = require('./schema');
 const AppError = require('../utils/AppError');
 
-async function getTeamMembers() {
+async function getTeamMembers(deviceType, networkSpeed) {
   try {
     await connect();
     const TeamMember = makeTeamMemberModel(mongoose);
     const members = await TeamMember.find().sort({ order: 1, createdAt: 1 }).exec();
+
+    let resolution = 1080;
+    if (deviceType === 'mobile') {
+      resolution = 1080;
+    } else {
+      const speedStr = networkSpeed || '';
+      if (speedStr.includes('Mbps')) {
+        const speed = parseFloat(speedStr);
+        if (!isNaN(speed)) {
+          if (speed > 5) resolution = 1080;
+          else if (speed >= 2) resolution = 640;
+          else resolution = 360;
+        }
+      } else {
+        switch (speedStr.toLowerCase()) {
+          case '4g': resolution = 1080; break;
+          case '3g': resolution = 640; break;
+          case '2g':
+          case 'slow-2g': resolution = 360; break;
+          default: resolution = 1080; break;
+        }
+      }
+    }
+
+    const processedMembers = members.map((m) => {
+      const memberObj = m.toObject ? m.toObject() : m;
+      if (memberObj.photo) {
+        try {
+          const urlObj = new URL(memberObj.photo);
+          urlObj.searchParams.set('w', resolution.toString());
+          memberObj.photo = urlObj.toString();
+        } catch (e) {
+          if (memberObj.photo.includes('?')) {
+            if (!memberObj.photo.includes('w=')) {
+              memberObj.photo = `${memberObj.photo}&w=${resolution}`;
+            }
+          } else {
+            memberObj.photo = `${memberObj.photo}?w=${resolution}`;
+          }
+        }
+      }
+      return memberObj;
+    });
+
     return {
-      data: members.map((m) => m.toObject()),
+      data: processedMembers,
       status: 200,
       error: null
     };
@@ -46,7 +90,7 @@ async function addTeamMember(payload) {
   }
 }
 
-async function getAuthors(limit = 20, page = 1) {
+async function getAuthors(limit = 20, page = 1, deviceType, networkSpeed) {
   try {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       throw new AppError('limit must be an integer between 1 and 100', 400);
@@ -59,8 +103,52 @@ async function getAuthors(limit = 20, page = 1) {
     const skip = (page - 1) * limit;
     const authors = await Author.find().sort({ order: 1, createdAt: 1 }).skip(skip).limit(limit).exec();
     const total = await Author.countDocuments().exec();
+
+    let resolution = 1080;
+    if (deviceType === 'mobile') {
+      resolution = 1080;
+    } else {
+      const speedStr = networkSpeed || '';
+      if (speedStr.includes('Mbps')) {
+        const speed = parseFloat(speedStr);
+        if (!isNaN(speed)) {
+          if (speed > 5) resolution = 1080;
+          else if (speed >= 2) resolution = 640;
+          else resolution = 360;
+        }
+      } else {
+        switch (speedStr.toLowerCase()) {
+          case '4g': resolution = 1080; break;
+          case '3g': resolution = 640; break;
+          case '2g':
+          case 'slow-2g': resolution = 360; break;
+          default: resolution = 1080; break;
+        }
+      }
+    }
+
+    const processedAuthors = authors.map((a) => {
+      const authorObj = a.toObject ? a.toObject() : a;
+      if (authorObj.photo) {
+        try {
+          const urlObj = new URL(authorObj.photo);
+          urlObj.searchParams.set('w', resolution.toString());
+          authorObj.photo = urlObj.toString();
+        } catch (e) {
+          if (authorObj.photo.includes('?')) {
+            if (!authorObj.photo.includes('w=')) {
+              authorObj.photo = `${authorObj.photo}&w=${resolution}`;
+            }
+          } else {
+            authorObj.photo = `${authorObj.photo}?w=${resolution}`;
+          }
+        }
+      }
+      return authorObj;
+    });
+
     return {
-      data: { authors: authors.map((a) => a.toObject()), total, limit, page },
+      data: { authors: processedAuthors, total, limit, page },
       status: 200,
       error: null
     };

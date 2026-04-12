@@ -30,7 +30,9 @@ const getAuthors = async (req, res) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
     const page = req.query.page ? parseInt(req.query.page, 10) : 1;
-    const result = await getAuthorsService(limit, page);
+    const deviceType = req.query.deviceType;
+    const networkSpeed = req.query.networkSpeed;
+    const result = await getAuthorsService(limit, page, deviceType, networkSpeed);
     if (!result || result.error) {
       return res.status(result?.status || 500).json({ success: false, error: result?.error || 'Failed to fetch authors' });
     }

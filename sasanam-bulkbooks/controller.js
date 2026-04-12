@@ -64,7 +64,8 @@ const getBulkBooks = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
-    const result = await service.getBulkBooks({}, page, limit);
+    const { deviceType, networkSpeed } = req.query;
+    const result = await service.getBulkBooks({}, page, limit, deviceType, networkSpeed);
     res.json(result);
   } catch (err) {
     next(err);
