@@ -159,21 +159,18 @@ router.get('/:id/view', async (req, res) => {
     const result = await getStreamFromR2(pdfKey, range);
     if (!result) return res.status(404).json({ error: 'file not found in storage' });
 
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Accept-Ranges': 'bytes',
+      'Content-Length': result.contentLength,
+      'Cache-Control': 'private, max-age=3600',
+    });
+
     if (range && result.contentRange) {
-      res.writeHead(206, {
-        'Content-Range': result.contentRange,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': result.contentLength,
-        'Content-Type': 'application/pdf',
-        'Cache-Control': 'private, max-age=3600',
-      });
+      res.set('Content-Range', result.contentRange);
+      res.status(206);
     } else {
-      res.writeHead(200, {
-        'Content-Length': result.contentLength,
-        'Content-Type': 'application/pdf',
-        'Accept-Ranges': 'bytes',
-        'Cache-Control': 'private, max-age=3600',
-      });
+      res.status(200);
     }
 
     result.stream.pipe(res);
