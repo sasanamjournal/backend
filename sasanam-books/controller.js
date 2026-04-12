@@ -131,7 +131,8 @@ const createBook = async (req, res) => {
 
 const getBookById = async (req, res) => {
   try {
-    const result = await service.getBookById(req.params.id);
+    const { deviceType, networkSpeed } = req.query;
+    const result = await service.getBookById(req.params.id, deviceType, networkSpeed);
     if (result.error) {
       return res.status(result.status).json({ success: false, error: result.error });
     }

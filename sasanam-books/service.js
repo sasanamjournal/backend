@@ -80,7 +80,7 @@ async function createBook(data) {
   }
 }
 
-async function getBookById(id) {
+async function getBookById(id, deviceType, networkSpeed) {
   try {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       throw new AppError('Invalid book ID format', 400);
@@ -90,8 +90,52 @@ async function getBookById(id) {
     if (!books || books.length === 0) {
       throw new AppError('Book not found', 404);
     }
+
+    let resolution = 1080;
+    if (deviceType === 'mobile') {
+      resolution = 1080;
+    } else {
+      const speedStr = networkSpeed || '';
+      if (speedStr.includes('Mbps')) {
+        const speed = parseFloat(speedStr);
+        if (!isNaN(speed)) {
+          if (speed > 5) resolution = 1080;
+          else if (speed >= 2) resolution = 640;
+          else resolution = 360;
+        }
+      } else {
+        switch(speedStr.toLowerCase()) {
+          case '4g': resolution = 1080; break;
+          case '3g': resolution = 640; break;
+          case '2g': 
+          case 'slow-2g': resolution = 360; break;
+          default: resolution = 1080; break; 
+        }
+      }
+    }
+
+    const processedBooks = books.map(b => {
+      const bookObj = b.toObject();
+      if (bookObj.coverImage) {
+        try {
+          const urlObj = new URL(bookObj.coverImage);
+          urlObj.searchParams.set('w', resolution.toString());
+          bookObj.coverImage = urlObj.toString();
+        } catch(e) {
+          if (bookObj.coverImage.includes('?')) {
+            if (!bookObj.coverImage.includes('w=')) {
+              bookObj.coverImage = `${bookObj.coverImage}&w=${resolution}`;
+            }
+          } else {
+            bookObj.coverImage = `${bookObj.coverImage}?w=${resolution}`;
+          }
+        }
+      }
+      return bookObj;
+    });
+
     return {
-      data: books.map(b => b.toObject()),
+      data: processedBooks,
       status: 200,
       error: null
     };

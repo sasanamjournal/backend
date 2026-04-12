@@ -3,14 +3,14 @@
 const mongoose = require('mongoose');
 const SasanmaBulkBook = require('./schema');
 const AppError = require('../utils/AppError');
-const { getStreamFromR2,deleteFromR2 } = require('../utils/r2');
+const { getStreamFromR2, deleteFromR2 } = require('../utils/r2');
 const makeUserModel = require('../auth/schema');
 const makeRoleModel = require('../auth/roleSchema');
 const createBulkBook = async (data) => {
   return await SasanmaBulkBook.create(data);
 };
 
-const getBulkBooks = async (filter = {}, page = 1, limit = 10) => {
+const getBulkBooks = async (filter = {}, page = 1, limit = 10, deviceType, networkSpeed) => {
   const skip = (page - 1) * limit;
   const [books, total] = await Promise.all([
     SasanmaBulkBook.find(filter).skip(skip).limit(limit),
@@ -19,8 +19,52 @@ const getBulkBooks = async (filter = {}, page = 1, limit = 10) => {
   if (!books || books.length === 0) {
     throw new AppError('No data found', 404);
   }
+
+  let resolution = 1080;
+  if (deviceType === 'mobile') {
+    resolution = 1080;
+  } else {
+    const speedStr = networkSpeed || '';
+    if (speedStr.includes('Mbps')) {
+      const speed = parseFloat(speedStr);
+      if (!isNaN(speed)) {
+        if (speed > 5) resolution = 1080;
+        else if (speed >= 2) resolution = 640;
+        else resolution = 360;
+      }
+    } else {
+      switch (speedStr.toLowerCase()) {
+        case '4g': resolution = 1080; break;
+        case '3g': resolution = 640; break;
+        case '2g':
+        case 'slow-2g': resolution = 360; break;
+        default: resolution = 1080; break;
+      }
+    }
+  }
+
+  const processedBooks = books.map(b => {
+    const bookObj = b.toObject ? b.toObject() : b;
+    if (bookObj.coverImage) {
+      try {
+        const urlObj = new URL(bookObj.coverImage);
+        urlObj.searchParams.set('w', resolution.toString());
+        bookObj.coverImage = urlObj.toString();
+      } catch (e) {
+        if (bookObj.coverImage.includes('?')) {
+          if (!bookObj.coverImage.includes('w=')) {
+            bookObj.coverImage = `${bookObj.coverImage}&w=${resolution}`;
+          }
+        } else {
+          bookObj.coverImage = `${bookObj.coverImage}?w=${resolution}`;
+        }
+      }
+    }
+    return bookObj;
+  });
+
   return {
-    data: books,
+    data: processedBooks,
     total,
     page,
     pageSize: limit,
@@ -69,11 +113,11 @@ const updateBulkBook = async (id, data) => {
 
 const deleteBulkBook = async (id) => {
   const book = await SasanmaBulkBook.findById(id);
-   if (!book) {
+  if (!book) {
     throw new AppError('book not found', 404);
   }
-   if (book.pdfFile) await deleteFromR2(book.pdfFile);
-    if (book.coverImage) await deleteFromR2(book.coverImage);
+  if (book.pdfFile) await deleteFromR2(book.pdfFile);
+  if (book.coverImage) await deleteFromR2(book.coverImage);
   await SasanmaBulkBook.findByIdAndDelete(id);
   return book;
 };
@@ -112,58 +156,58 @@ const viewBulkBookPdf = async (id, res, range) => {
 
 const downloadBulkBookPdf = async (req, res) => {
   try {
-      const book = await SasanmaBulkBook.findById(req.params.id).exec();
-      if (!book) return res.status(404).json({ error: 'book not found' });
-  
-      // Get current user
-      const User = makeUserModel(mongoose);
-      const user = await User.findById(req.user.sub).exec();
-      if (!user) return res.status(401).json({ error: 'user not found' });
-  
-      // Check if user has unlimited access (subscribed / canDownload / role permission)
-      let unlimitedAccess = user.isSubscribed || user.canDownload;
-      if (!unlimitedAccess) {
-        const Role = makeRoleModel(mongoose);
-        const roleDoc = await Role.findOne({ name: user.role }).lean();
-        if (roleDoc?.permissions?.frontend?.download) unlimitedAccess = true;
-      }
-  
-      // If no unlimited access, check free download limit
-      if (!unlimitedAccess) {
-        const currentCount = user.downloadCount || 0;
-        if (currentCount >= FREE_DOWNLOAD_LIMIT) {
-          return res.status(403).json({
-            error: 'free_limit_reached',
-            message: `You have used all ${FREE_DOWNLOAD_LIMIT} free downloads. Subscribe to download more.`,
-            downloadCount: currentCount,
-            freeLimit: FREE_DOWNLOAD_LIMIT,
-          });
-        }
-      }
-  
-      // Resolve PDF key
-      const pdfKey = book.pdfFile || '';
-      if (!pdfKey) {
-        return res.status(404).json({ error: 'no PDF file associated with this book' });
-      }
-  
-      const result = await getStreamFromR2(pdfKey);
-      if (!result) {
-        return res.status(404).json({ error: 'PDF file not found in storage' });
-      }
-  
-      // Increment download count for non-unlimited users
-      if (!unlimitedAccess) {
-        await User.findByIdAndUpdate(user._id, { $inc: { downloadCount: 1 } });
-      }
-  
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(pdfKey.split('/').pop() || 'book.pdf')}"`);
-      result.stream.pipe(res);
-    } catch (err) {
-      console.error('Download error:', err);
-      res.status(500).json({ error: 'download failed' });
+    const book = await SasanmaBulkBook.findById(req.params.id).exec();
+    if (!book) return res.status(404).json({ error: 'book not found' });
+
+    // Get current user
+    const User = makeUserModel(mongoose);
+    const user = await User.findById(req.user.sub).exec();
+    if (!user) return res.status(401).json({ error: 'user not found' });
+
+    // Check if user has unlimited access (subscribed / canDownload / role permission)
+    let unlimitedAccess = user.isSubscribed || user.canDownload;
+    if (!unlimitedAccess) {
+      const Role = makeRoleModel(mongoose);
+      const roleDoc = await Role.findOne({ name: user.role }).lean();
+      if (roleDoc?.permissions?.frontend?.download) unlimitedAccess = true;
     }
+
+    // If no unlimited access, check free download limit
+    if (!unlimitedAccess) {
+      const currentCount = user.downloadCount || 0;
+      if (currentCount >= FREE_DOWNLOAD_LIMIT) {
+        return res.status(403).json({
+          error: 'free_limit_reached',
+          message: `You have used all ${FREE_DOWNLOAD_LIMIT} free downloads. Subscribe to download more.`,
+          downloadCount: currentCount,
+          freeLimit: FREE_DOWNLOAD_LIMIT,
+        });
+      }
+    }
+
+    // Resolve PDF key
+    const pdfKey = book.pdfFile || '';
+    if (!pdfKey) {
+      return res.status(404).json({ error: 'no PDF file associated with this book' });
+    }
+
+    const result = await getStreamFromR2(pdfKey);
+    if (!result) {
+      return res.status(404).json({ error: 'PDF file not found in storage' });
+    }
+
+    // Increment download count for non-unlimited users
+    if (!unlimitedAccess) {
+      await User.findByIdAndUpdate(user._id, { $inc: { downloadCount: 1 } });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(pdfKey.split('/').pop() || 'book.pdf')}"`);
+    result.stream.pipe(res);
+  } catch (err) {
+    console.error('Download error:', err);
+    res.status(500).json({ error: 'download failed' });
+  }
 };
 
 module.exports = {
@@ -174,4 +218,4 @@ module.exports = {
   deleteBulkBook,
   viewBulkBookPdf,
   downloadBulkBookPdf,
-  };
+};
